@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 海螺咖啡馆 · 浅海光影调 */
+:root {
+  --cream: #fff8f0;
+  --coral: #ff9b8e;
+  --text-main: #4a3b32;
+  --gradient-ocean: linear-gradient(
+    175deg,
+    #fff4e6 0%,
+    #ffe8d6 15%,
+    #d4edea 55%,
+    #b8e0dc 85%,
+    #9dd5cf 100%
+  );
+  --gradient-cafe: linear-gradient(
+    175deg,
+    #fff4e6 0%,
+    #ffead5 12%,
+    #ffddc4 28%,
+    #ffe0cf 44%,
+    #d4edea 68%,
+    #b8e0dc 85%,
+    #9dd5cf 100%
+  );
+}
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  background: var(--cream);
+  color: var(--text-main);
+  font-family: "Noto Sans SC", system-ui, sans-serif;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* 正文最小 16px，儿童用眼友好 */
+.text-sm {
+  font-size: 1rem !important;
+}
+/* 防止极小字号在小屏手机上不可读 */
+.text-xs,
+.text-\[10px\],
+.text-\[11px\] {
+  font-size: 0.75rem !important;
+}
+
+/* ── 共享工具类 ── */
+.bg-ocean-shimmer {
+  background: var(--gradient-ocean);
+}
+.bg-cafe-gradient {
+  background: var(--gradient-cafe);
+}
+
+/* ── 动画 ── */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes shimmer {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.8) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15) rotate(3deg);
+  }
+  100% {
+    opacity: 0.4;
+    transform: scale(0.8) rotate(0deg);
+  }
+}
+@keyframes wave {
+  0%,
+  100% {
+    transform: translateX(0) translateY(0);
+  }
+  25% {
+    transform: translateX(3px) translateY(-1px);
+  }
+  75% {
+    transform: translateX(-3px) translateY(1px);
+  }
+}
+
+.animate-float {
+  animation: float 3.5s ease-in-out infinite;
+}
+.animate-pop-in {
+  animation: pop-in 0.45s ease-out both;
+}
