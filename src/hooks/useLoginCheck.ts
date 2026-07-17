@@ -20,6 +20,9 @@ export function useLoginCheck() {
 
     if (lastLoginDate === today) return;
 
+    // 跨天重置今日探险计数
+    useStore.getState().resetAdventureCount();
+
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().slice(0, 10);

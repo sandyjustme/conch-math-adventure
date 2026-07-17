@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import useStore from "../../store/useStore";
+import { getGlobalMultiplier } from "../../engine/rewardEngine";
 import {
   ALL_TASKS,
   DIVE_MAX,
@@ -59,6 +60,8 @@ export default function DiveMath() {
   const showToast = useStore((s) => s.showToast);
   const sfxEnabled = useStore((s) => s.sfxEnabled);
   const diveFocus = useStore((s) => s.diveFocus);
+  const diveFromAdventure = useStore((s) => s.diveFromAdventure);
+  const todayAdventureCount = useStore((s) => s.todayAdventureCount);
 
   const tasks = useMemo(
     () =>
@@ -73,9 +76,8 @@ export default function DiveMath() {
   const [trail, setTrail] = useState<
     { from: number; to: number; label: string }[]
   >([]);
-  const [hint, setHint] = useState<{ dir: "up" | "down"; to: number } | null>(
-    null
-  );
+  const [hint, setHint] = useState<{ dir: "up" | "down" } | null>(null);
+  const [wrongCount, setWrongCount] = useState(0);
   const [phase, setPhase] = useState<"playing" | "done">("playing");
   const [showIntro, setShowIntro] = useState(() => {
     try {
@@ -109,6 +111,7 @@ export default function DiveMath() {
     setCurrent(tasks[idx].startAt);
     setTrail([]);
     setHint(null);
+    setWrongCount(0);
     setPhase("playing");
   };
 
@@ -140,21 +143,30 @@ export default function DiveMath() {
       setHint(null);
       if (stepIdx === steps.length - 1) {
         setPhase("done");
-        addFragments(1);
+        // 答错倒扣 + 倍率计算
+        const base = Math.max(0, 1 - wrongCount * 0.1);
+        const fromAdventure = diveFromAdventure ? 1 : 0.2;
+        const globalMult = getGlobalMultiplier(todayAdventureCount);
+        const final = Math.floor(base * fromAdventure * globalMult);
+        if (final > 0) {
+          addFragments(final);
+          showToast("fragment", final);
+        }
         addAnswerRecord({
           nodeId: task.node,
           correct: true,
           latencyMs: 0,
           timestamp: Date.now(),
         });
-        showToast("fragment", 1);
       } else {
         setCurrent(step.to);
         setStepIdx((i) => i + 1);
       }
     } else {
       beep(220, sfxEnabled);
-      setHint({ dir: step.to > step.from ? "up" : "down", to: step.to });
+      // 只显示方向，不暴露精确终点
+      setHint({ dir: step.to > step.from ? "up" : "down" });
+      setWrongCount((c) => c + 1);
       setCurrent(step.from);
     }
   };
@@ -374,27 +386,34 @@ export default function DiveMath() {
             ))}
 
             {/* 出错时的方向提示 */}
-            {hint && (
-              <g>
-                <line
-                  x1={AXIS_X}
-                  y1={valueToY(step.from)}
-                  x2={AXIS_X}
-                  y2={valueToY(hint.to)}
-                  stroke="#F87171"
-                  strokeWidth="2"
-                  strokeDasharray="5 4"
-                />
-                <text
-                  x={AXIS_X + 16}
-                  y={valueToY(hint.to) + 4}
-                  fontSize="11"
-                  fill="#EF4444"
-                >
-                  往这里{hint.dir === "up" ? "浮 ↑" : "潜 ↓"}
-                </text>
-              </g>
-            )}
+            {hint &&
+              (() => {
+                const arrowEnd =
+                  hint.dir === "up"
+                    ? Math.min(DIVE_MAX, step.from + 4)
+                    : Math.max(DIVE_MIN, step.from - 4);
+                return (
+                  <g>
+                    <line
+                      x1={AXIS_X}
+                      y1={valueToY(step.from)}
+                      x2={AXIS_X}
+                      y2={valueToY(arrowEnd)}
+                      stroke="#F87171"
+                      strokeWidth="2"
+                      strokeDasharray="5 4"
+                    />
+                    <text
+                      x={AXIS_X + 16}
+                      y={valueToY(arrowEnd) + 4}
+                      fontSize="11"
+                      fill="#EF4444"
+                    >
+                      往{hint.dir === "up" ? "上浮 ↑" : "下潜 ↓"}
+                    </text>
+                  </g>
+                );
+              })()}
 
             {/* 海螺（可拖动） */}
             <g

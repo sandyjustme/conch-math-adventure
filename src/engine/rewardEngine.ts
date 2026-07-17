@@ -59,3 +59,11 @@ export function shouldMarkBreakthrough(
 
   return recent.correct && prevAccuracy < 0.5;
 }
+
+// 全局碎片倍率：基于今日探险完成数
+// 0 关 → 0.5（惩罚），1 关 → 1.5，2+ 关 → 2.0（封顶）
+export function getGlobalMultiplier(todayAdventureCount: number): number {
+  if (todayAdventureCount >= 2) return 2.0;
+  if (todayAdventureCount >= 1) return 1.5;
+  return 0.5;
+}

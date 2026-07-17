@@ -52,8 +52,12 @@ export default function AdventureChat() {
   const currentNodeId = useStore((s) => s.currentNodeId);
   const setCurrentNode = useStore((s) => s.setCurrentNode);
   const addPearls = useStore((s) => s.addPearls);
+  const addFragments = useStore((s) => s.addFragments);
   const showToast = useStore((s) => s.showToast);
   const setDiveFocus = useStore((s) => s.setDiveFocus);
+  const setDiagnosticsCompleted = useStore((s) => s.setDiagnosticsCompleted);
+  const incrementAdventureCount = useStore((s) => s.incrementAdventureCount);
+  const setDiveFromAdventure = useStore((s) => s.setDiveFromAdventure);
   const masterNode = useStore((s) => s.masterNode);
   const addAnswerRecord = useStore((s) => s.addAnswerRecord);
 
@@ -72,6 +76,7 @@ export default function AdventureChat() {
     ready: false,
   });
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fragPending = useRef(0); // 累加 0.5 碎片，满 1 才入账
 
   useEffect(() => () => stopListening(), []);
 
@@ -103,9 +108,33 @@ export default function AdventureChat() {
 
         const rewardGained = parseRewardTag(reply);
         const isWrong = parseWrongTag(reply);
+        const isPractice = parsePracticeTag(reply);
+
         if (rewardGained > 0) {
           addPearls(rewardGained);
+          addFragments(2);
           showToast("pearl", rewardGained);
+        }
+
+        // 每轮对话 0.5 碎片（PRACTICE 跳转那轮也计入）
+        if (text !== "我准备好了，开始吧！") {
+          fragPending.current += 0.5;
+          if (fragPending.current >= 1) {
+            const earned = Math.floor(fragPending.current);
+            addFragments(earned);
+            fragPending.current -= earned;
+          }
+        }
+
+        // PRACTICE：聊通了一个知识点
+        if (isPractice) {
+          addFragments(3);
+          if (fragPending.current > 0) {
+            addFragments(1);
+            fragPending.current = 0;
+          }
+          setDiagnosticsCompleted();
+          incrementAdventureCount();
         }
 
         // ── 诊断引擎：记录每次答题 + 定期溯源断点 ──

@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import useStore from "../../store/useStore";
+import { getGlobalMultiplier } from "../../engine/rewardEngine";
 import { useAudio } from "../../hooks/useAudio";
 import Mascot from "../shared/Mascot";
 
@@ -21,6 +22,7 @@ interface Pearl {
 export default function ShellCollector() {
   const addFragments = useStore((s) => s.addFragments);
   const showToast = useStore((s) => s.showToast);
+  const todayAdventureCount = useStore((s) => s.todayAdventureCount);
   const audio = useAudio();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -69,7 +71,8 @@ export default function ShellCollector() {
       setTimeLeft(Math.ceil(remaining / 1000));
 
       if (remaining <= 0) {
-        const earned = Math.max(1, Math.floor(s.score / 2));
+        const mult = getGlobalMultiplier(todayAdventureCount);
+        const earned = Math.floor(Math.max(1, Math.floor(s.score / 2)) * mult);
         addFragments(earned);
         if (earned > 0) showToast("fragment", earned);
         setResult(

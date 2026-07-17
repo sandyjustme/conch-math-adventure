@@ -38,6 +38,19 @@ interface AppState {
   diveFocus: string | null;
   setDiveFocus: (f: string | null) => void;
 
+  // 首次诊断完成标志（持久化）
+  diagnosticsCompleted: boolean;
+  setDiagnosticsCompleted: () => void;
+
+  // AI 跳转追踪（不持久化）
+  diveFromAdventure: boolean;
+  setDiveFromAdventure: (v: boolean) => void;
+
+  // 今日探险通关数（不持久化，跨天重置）
+  todayAdventureCount: number;
+  incrementAdventureCount: () => void;
+  resetAdventureCount: () => void;
+
   setView: (view: View) => void;
 
   addFragments: (n: number) => void;
@@ -115,6 +128,19 @@ const useStore = create<AppState>((set) => ({
 
   diveFocus: null,
   setDiveFocus: (f) => set({ diveFocus: f }),
+
+  diagnosticsCompleted: false,
+  setDiagnosticsCompleted: () => set({ diagnosticsCompleted: true }),
+
+  diveFromAdventure: false,
+  setDiveFromAdventure: (v) => set({ diveFromAdventure: v }),
+
+  todayAdventureCount: 0,
+  incrementAdventureCount: () =>
+    set((s) => ({
+      todayAdventureCount: Math.min(2, s.todayAdventureCount + 1),
+    })),
+  resetAdventureCount: () => set({ todayAdventureCount: 0 }),
 
   setView: (view) => set({ currentView: view }),
 

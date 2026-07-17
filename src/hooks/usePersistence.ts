@@ -53,6 +53,7 @@ export function usePersistence() {
   const answerRecords = useStore((s) => s.answerRecords);
   const sneakAttacks = useStore((s) => s.sneakAttacks);
   const redemptions = useStore((s) => s.redemptions);
+  const diagnosticsCompleted = useStore((s) => s.diagnosticsCompleted);
 
   const load = useCallback(async () => {
     try {
@@ -73,6 +74,8 @@ export function usePersistence() {
       if (reds) useStore.setState({ redemptions: reds });
       const shells2 = await getItem("rareShells");
       if (shells2) useStore.setState({ rareShells: shells2 });
+      const diag = await getItem("diagnosticsCompleted");
+      if (diag === true) useStore.setState({ diagnosticsCompleted: true });
     } catch (e) {
       console.error("Failed to load state:", e);
     }
@@ -86,6 +89,7 @@ export function usePersistence() {
       await setItem("answerRecords", answerRecords);
       await setItem("redemptions", redemptions);
       await setItem("rareShells", rareShells);
+      await setItem("diagnosticsCompleted", diagnosticsCompleted);
     } catch (e) {
       console.error("Failed to save state:", e);
     }
@@ -97,6 +101,7 @@ export function usePersistence() {
     answerRecords,
     redemptions,
     rareShells,
+    diagnosticsCompleted,
   ]);
 
   useEffect(() => {

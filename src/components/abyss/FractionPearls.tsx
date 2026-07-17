@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import useStore from "../../store/useStore";
+import { getGlobalMultiplier } from "../../engine/rewardEngine";
+import { speakText } from "../../services/audio";
 
 /**
  * 分数珍珠 —— 古深海遗迹的第一个试点原型。
@@ -106,6 +108,7 @@ export default function FractionPearls() {
   const addFragments = useStore((s) => s.addFragments);
   const addAnswerRecord = useStore((s) => s.addAnswerRecord);
   const showToast = useStore((s) => s.showToast);
+  const todayAdventureCount = useStore((s) => s.todayAdventureCount);
 
   const [levelIdx, setLevelIdx] = useState(0);
   const lv = LEVELS[levelIdx];
@@ -119,6 +122,7 @@ export default function FractionPearls() {
   );
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [phase, setPhase] = useState<"playing" | "done">("playing");
+  const [ttsPlaying, setTtsPlaying] = useState(false);
   const [, setTick] = useState(0);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -193,7 +197,15 @@ export default function FractionPearls() {
     setTick((n) => n + 1);
     if (newSlots.filter((s) => s !== null).length === lv.numer) {
       setPhase("done");
-      addFragments(1);
+      const mult = getGlobalMultiplier(todayAdventureCount);
+      const earned = Math.floor(1 * mult);
+      if (earned > 0) {
+        addFragments(earned);
+        showToast("fragment", earned);
+      }
+      // TTS 朗读过关小结
+      setTtsPlaying(true);
+      speakText(lv.recap).finally(() => setTtsPlaying(false));
       addAnswerRecord({
         nodeId: "K1",
         correct: true,
@@ -465,23 +477,26 @@ export default function FractionPearls() {
         {phase === "playing" ? (
           <button
             onClick={resetLevel}
-            className="flex-1 py-3 rounded-full bg-white/8 text-white/50 text-sm font-bold hover:bg-white/15"
+            disabled={ttsPlaying}
+            className="flex-1 py-3 rounded-full bg-white/8 text-white/50 text-sm font-bold hover:bg-white/15 disabled:opacity-30"
           >
             重摆这一碑
           </button>
         ) : levelIdx < LEVELS.length - 1 ? (
           <button
             onClick={() => beginLevel(levelIdx + 1)}
-            className="flex-1 py-3 rounded-full bg-amber-600/80 text-white text-sm font-bold hover:bg-amber-500/80"
+            disabled={ttsPlaying}
+            className="flex-1 py-3 rounded-full bg-amber-600/80 text-white text-sm font-bold hover:bg-amber-500/80 disabled:opacity-40"
           >
-            → 下一块碑
+            {ttsPlaying ? "听海小喵说完…" : "→ 下一块碑"}
           </button>
         ) : (
           <button
             onClick={() => setView("cafe")}
-            className="flex-1 py-3 rounded-full bg-teal-600 text-white text-sm font-bold hover:bg-teal-500"
+            disabled={ttsPlaying}
+            className="flex-1 py-3 rounded-full bg-teal-600 text-white text-sm font-bold hover:bg-teal-500 disabled:opacity-40"
           >
-            全部破译，浮回海面 🎉
+            {ttsPlaying ? "听海小喵说完…" : "全部破译，浮回海面 🎉"}
           </button>
         )}
       </div>
