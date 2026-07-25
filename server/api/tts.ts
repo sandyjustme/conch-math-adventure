@@ -19,7 +19,7 @@ export async function handler(req: Request): Promise<Response> {
       app: { appid: appId, token, cluster: "volcano_tts" },
       user: { uid: "conch-student" },
       audio: {
-        voice_type: "zh_female_qingxin",
+        voice_type: "zh_female_tianmei",
         encoding: "mp3",
         speed_ratio: 0.9,
       },
@@ -43,7 +43,7 @@ export async function handler(req: Request): Promise<Response> {
         "Cache-Control": "public, max-age=86400",
       },
     });
-  } catch (e) {
+  } catch {
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

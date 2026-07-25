@@ -14,7 +14,7 @@ import {
 import Mascot from "../shared/Mascot";
 
 /**
- * 海龟汤 —— 海螺咖啡馆的隐藏菜单。
+ * 海龟汤 —— 喵喵趣学的隐藏菜单。
  * 汤面是纯生活故事（零数字、零数学词），数学藏在世界规则里；
  * 孩子问是非题破案，破案那一刻才发现"原来是这么回事"。用好奇心，不是考试。
  */
@@ -102,7 +102,7 @@ function stars(n: number) {
 }
 
 function soupSystemPrompt(soup: Soup): string {
-  return `你是「海螺咖啡馆」的海小喵🐚，正陪一个初一学生玩海龟汤（情境推理）。你已经知道谜底，学生要靠问「是非题」来猜。
+  return `你是「喵喵趣学」的海小喵🐚，正陪一个初一学生玩海龟汤（情境推理）。你已经知道谜底，学生要靠问「是非题」来猜。
 
 【这碗汤】
 汤面：${soup.surface}
@@ -113,7 +113,7 @@ function soupSystemPrompt(soup: Soup): string {
 1. 学生每问一句，你只许回下面四种之一，一个多余的字都不许加：
    「是」 / 「不是」 / 「无关」 / 「这不是是非题哦，换成『是不是…』来问我」
 2. 绝不鼓励、绝不提示、绝不评价。禁止说「好问题」「接近了」「再想想」「不错哦」之类任何多余的话。
-3. 唯一的例外：当学生说出的想法**命中了破案判定的核心**，你必须**在这一条回复里立刻宣布破案，绝不能等他再问、再提醒、或再确认一次**。这条回复必须**以「🎉 你破案了！」开头**，接着用两三句大白话把汤底讲清楚、自然点出背后的数学道理（别说教），最后另起一行追加隐藏标记 <!--REWARD:2--> 和 <!--SOLVED-->（前端会隐藏，绝不能告诉学生有这标记）。
+3. 唯一的例外：当学生说出的想法**命中了破案判定的核心**，你必须**在这一条回复里立刻宣布破案，绝不能等他再问、再提醒、或再确认一次**。这条回复必须**以「🎉 你破案了！」开头**，接着用两三句大白话把汤底讲清楚、自然点出背后的数学道理（别说教），最后另起一行追加隐藏标记 <!--REWARD:5--> 和 <!--SOLVED-->（前端会隐藏，绝不能告诉学生有这标记）。
 4. 只有真正命中核心才算破案。只是沾边、方向对但没说到点子上，仍然只回「是 / 不是 / 无关」，绝不提前揭晓，也绝不说「破案」二字。
 5. 全程中文，句子越短越好。`;
 }
@@ -121,8 +121,13 @@ function soupSystemPrompt(soup: Soup): string {
 export default function SoupKitchen() {
   const setView = useStore((s) => s.setView);
   const addPearls = useStore((s) => s.addPearls);
+  const addPlayTokens = useStore((s) => s.addPlayTokens);
   const showToast = useStore((s) => s.showToast);
   const currentNodeId = useStore((s) => s.currentNodeId);
+  const solvedSoups = useStore((s) => s.solvedSoups);
+  const revealedSoups = useStore((s) => s.revealedSoups);
+  const addSolvedSoup = useStore((s) => s.addSolvedSoup);
+  const addRevealedSoup = useStore((s) => s.addRevealedSoup);
 
   const [soup, setSoup] = useState<Soup | null>(null);
   const [messages, setMessages] = useState<
@@ -209,7 +214,12 @@ export default function SoupKitchen() {
     const ok = startListening(
       "zh-CN",
       (text) => setInput(text),
-      () => setListening(false)
+      (err) => {
+        setListening(false);
+        if (err) {
+          setMessages([...messages, { role: "assistant", text: err }]);
+        }
+      }
     );
     if (ok) setListening(true);
   };
@@ -224,21 +234,42 @@ export default function SoupKitchen() {
     try {
       const reply = await sendChatMessage(nm, soupSystemPrompt(soup));
       const gained = parseRewardTag(reply);
-      // 双保险：认隐藏标记，也认「破案了」这句可见的话——严格主持下没破案时绝不会出现「破案」二字
       const isSolved =
         reply.includes("<!--SOLVED-->") || /破案了|破案啦/.test(reply);
       const clean = cleanTags(reply).replace("<!--SOLVED-->", "").trim();
-      setMessages([
-        ...nm,
-        { role: "assistant", text: clean || "（想一想，换成「是不是…」问我）" },
-      ]);
-      // 命中破案但模型漏了奖励标记时，兜底给 2 颗珍珠
-      const reward = gained > 0 ? gained : isSolved ? 2 : 0;
-      if (reward > 0) {
-        addPearls(reward);
-        showToast("pearl", reward);
+
+      // 已解过或看过汤底 → 不给奖励
+      const soupId = soup.id;
+      const alreadySolved = solvedSoups.includes(soupId);
+      const wasRevealed = revealedSoups.includes(soupId);
+
+      if (isSolved && alreadySolved) {
+        setMessages([
+          ...nm,
+          { role: "assistant", text: "这碗汤你已经破解过了～" },
+        ]);
+      } else if (isSolved && wasRevealed) {
+        setMessages([
+          ...nm,
+          { role: "assistant", text: "你知道了汤底，这碗汤不再给奖励啦" },
+        ]);
+      } else {
+        setMessages([
+          ...nm,
+          {
+            role: "assistant",
+            text: clean || "（想一想，换成「是不是…」问我）",
+          },
+        ]);
+        if (isSolved) {
+          const reward = gained > 0 ? gained : 5;
+          addPearls(reward);
+          addPlayTokens(3);
+          addSolvedSoup(soupId);
+          showToast("pearl", reward);
+          setSolved(true);
+        }
       }
-      if (isSolved) setSolved(true);
     } catch (e) {
       console.error("SoupKitchen send failed:", e);
       setMessages([
@@ -301,6 +332,13 @@ export default function SoupKitchen() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-amber-100">{s.name}</span>
+                      {solvedSoups.includes(s.id) && (
+                        <span className="text-xs">✅</span>
+                      )}
+                      {revealedSoups.includes(s.id) &&
+                        !solvedSoups.includes(s.id) && (
+                          <span className="text-xs">👁️</span>
+                        )}
                       {isRec && (
                         <span className="text-[10px] bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 font-bold">
                           推荐给你
@@ -441,7 +479,10 @@ export default function SoupKitchen() {
               </button>
             </div>
             <button
-              onClick={() => setRevealed(true)}
+              onClick={() => {
+                setRevealed(true);
+                if (soup) addRevealedSoup(soup.id);
+              }}
               className="w-full py-2 rounded-full bg-white/10 text-white/60 text-xs hover:bg-white/20"
             >
               💡 想不出来了，揭晓汤底

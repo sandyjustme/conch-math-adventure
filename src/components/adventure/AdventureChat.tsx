@@ -14,7 +14,7 @@ import {
   startListening,
   stopListening,
 } from "../../services/stt";
-import { speakText } from "../../services/audio";
+import { speak } from "../../services/tts";
 import { runDiagnostic } from "../../engine/diagnostic";
 import OceanLine from "./OceanLine";
 import Mascot from "../shared/Mascot";
@@ -57,7 +57,6 @@ export default function AdventureChat() {
   const setDiveFocus = useStore((s) => s.setDiveFocus);
   const setDiagnosticsCompleted = useStore((s) => s.setDiagnosticsCompleted);
   const incrementAdventureCount = useStore((s) => s.incrementAdventureCount);
-  const setDiveFromAdventure = useStore((s) => s.setDiveFromAdventure);
   const masterNode = useStore((s) => s.masterNode);
   const addAnswerRecord = useStore((s) => s.addAnswerRecord);
 
@@ -116,9 +115,9 @@ export default function AdventureChat() {
           showToast("pearl", rewardGained);
         }
 
-        // 每轮对话 0.5 碎片（PRACTICE 跳转那轮也计入）
+        // 每轮对话 0.2 碎片（PRACTICE 跳转那轮也计入）
         if (text !== "我准备好了，开始吧！") {
-          fragPending.current += 0.5;
+          fragPending.current += 0.2;
           if (fragPending.current >= 1) {
             const earned = Math.floor(fragPending.current);
             addFragments(earned);
@@ -145,7 +144,7 @@ export default function AdventureChat() {
           latencyMs: 0,
           timestamp: Date.now(),
         });
-        // 每积累 3 条记录，跑一次诊断（延迟到下一帧，避免渲染中更新父组件状态）
+        // 每积累 3 条记录，跑一次诊断
         const totalRecords = useStore.getState().answerRecords.length + 1;
         if (totalRecords >= 3 && totalRecords % 3 === 0) {
           const diag = runDiagnostic(
@@ -153,7 +152,7 @@ export default function AdventureChat() {
             recordNode
           );
           if (diag.nodeId !== recordNode && diag.confidence > 0.4) {
-            setTimeout(() => setCurrentNode(diag.nodeId), 0);
+            setCurrentNode(diag.nodeId);
           }
         }
 
@@ -220,7 +219,12 @@ export default function AdventureChat() {
     const ok = startListening(
       "zh-CN",
       (t) => setInput(t),
-      () => setListening(false)
+      (err) => {
+        setListening(false);
+        if (err) {
+          setMessages([...messages, { role: "assistant", text: err }]);
+        }
+      }
     );
     if (ok) setListening(true);
   };
@@ -335,7 +339,7 @@ export default function AdventureChat() {
               </div>
               {m.role === "assistant" && (
                 <button
-                  onClick={() => speakText(m.text)}
+                  onClick={() => speak(m.text)}
                   className="self-start text-xs text-slate-500 hover:text-teal-500 px-1"
                   aria-label="朗读海小喵的话"
                 >

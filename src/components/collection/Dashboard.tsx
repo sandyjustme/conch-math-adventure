@@ -1,5 +1,5 @@
 import useStore from "../../store/useStore";
-import { NODES, NODE_MAP } from "../../data/knowledgeGraph";
+import { NODES } from "../../data/knowledgeGraph";
 import { computeAnalytics } from "../../engine/analytics";
 import Mascot from "../shared/Mascot";
 import RadarChart from "../shared/RadarChart";
@@ -20,7 +20,7 @@ export default function Dashboard() {
     const state = useStore.getState();
     const backup = {
       version: BACKUP_VERSION,
-      app: "海螺咖啡馆",
+      app: "喵喵趣学",
       exportedAt: new Date().toISOString(),
       data: {
         fragments: state.fragments,
@@ -43,7 +43,7 @@ export default function Dashboard() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `海螺备份-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `喵喵趣学备份-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -121,7 +121,7 @@ export default function Dashboard() {
 
   const exportReport = () => {
     const lines = [
-      "海螺喵数学探险 · 学习报告",
+      "喵喵趣学 · 学习报告",
       "──────────────────────────────",
       `生成时间：${new Date().toLocaleDateString("zh-CN")}`,
       "",

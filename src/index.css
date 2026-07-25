@@ -115,3 +115,21 @@ input:focus-visible {
 .animate-pop-in {
   animation: pop-in 0.45s ease-out both;
 }
+
+@keyframes celebration-particle {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx, 50px), var(--ty, -100px)) scale(0.2);
+  }
+}
+.animate-celebration-particle {
+  animation: celebration-particle 2.5s ease-out forwards;
+}

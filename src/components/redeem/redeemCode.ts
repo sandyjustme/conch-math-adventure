@@ -14,7 +14,14 @@ export function encodePayload(p: RedeemPayload): string {
 export function decodePayload(s: string): RedeemPayload | null {
   try {
     const obj = JSON.parse(decodeURIComponent(atob(s)));
-    if (obj && typeof obj.code === "string" && typeof obj.pin === "string")
+    if (
+      obj &&
+      typeof obj.code === "string" &&
+      typeof obj.pin === "string" &&
+      typeof obj.cost === "number" &&
+      typeof obj.ts === "number" &&
+      typeof obj.t === "string"
+    )
       return obj as RedeemPayload;
     return null;
   } catch {

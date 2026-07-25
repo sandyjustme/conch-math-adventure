@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import useStore from "../../store/useStore";
 import { getGlobalMultiplier } from "../../engine/rewardEngine";
+import { generateExpressions } from "../../data/expressionGenerator";
 import { useAudio } from "../../hooks/useAudio";
 import Mascot from "../shared/Mascot";
 
@@ -16,6 +17,7 @@ interface Bubble {
   y: number;
   r: number;
   value: number;
+  text: string;
   color: string;
   popped: boolean;
 }
@@ -24,6 +26,9 @@ export default function BubbleJump() {
   const addFragments = useStore((s) => s.addFragments);
   const showToast = useStore((s) => s.showToast);
   const todayAdventureCount = useStore((s) => s.todayAdventureCount);
+  const currentNodeId = useStore((s) => s.currentNodeId);
+  const masteredNodes = useStore((s) => s.masteredNodes);
+  const spendPlayTokens = useStore((s) => s.spendPlayTokens);
   const audio = useAudio();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -51,15 +56,17 @@ export default function BubbleJump() {
       "#98D8C8",
       "#F7DC6F",
     ];
+    const exprs = generateExpressions(currentNodeId, masteredNodes, 12);
     const list: Bubble[] = [];
-    const origin = randomInt(-8, 8);
     for (let i = 0; i < 12; i++) {
+      const expr = exprs[i] || { text: "1+1", value: 2 };
       list.push({
         x: randomInt(50, W - 50),
         y: H + randomInt(0, 300),
-        r: randomInt(24, 36),
-        value: randomInt(-10, 10),
-        color: colors[randomInt(0, colors.length - 1)],
+        r: Math.min(36, 20 + Math.abs(expr.text.length) * 2),
+        value: expr.value,
+        text: expr.text,
+        color: colors[i % colors.length],
         popped: false,
       });
     }
@@ -67,6 +74,10 @@ export default function BubbleJump() {
   };
 
   const startGame = useCallback(() => {
+    if (!spendPlayTokens(1)) {
+      showToast("fragment", 0);
+      return;
+    }
     const state = g.current;
     state.playerX = W / 2;
     state.score = 0;
@@ -77,7 +88,8 @@ export default function BubbleJump() {
     setScore(0);
     setTimeLeft(30);
     setResult(null);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spendPlayTokens, currentNodeId, masteredNodes]);
 
   useEffect(() => {
     if (!playing) return;
@@ -95,9 +107,7 @@ export default function BubbleJump() {
 
       if (remaining <= 0) {
         const mult = getGlobalMultiplier(todayAdventureCount);
-        const earned = Math.floor(
-          Math.max(1, Math.floor(state.score / 2)) * mult
-        );
+        const earned = Math.max(0, Math.floor((state.score / 2) * mult));
         addFragments(earned);
         if (earned > 0) showToast("fragment", earned);
         setResult(
@@ -184,7 +194,7 @@ export default function BubbleJump() {
         ctx.font = 'bold 16px "Noto Sans SC", sans-serif';
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(String(b.value), b.x, b.y);
+        ctx.fillText(b.text, b.x, b.y);
       }
 
       // Player (cat on a platform)
@@ -236,11 +246,14 @@ export default function BubbleJump() {
         if (b.popped) continue;
         if (Math.hypot(b.x - x, b.y - y) < b.r + 4) {
           b.popped = true;
-          if (b.value > 0) {
+          const result = b.value;
+          if (result > 0) {
             state.score++;
             setScore(state.score);
             audio.correct();
           } else {
+            state.score = Math.max(0, state.score - 1);
+            setScore(state.score);
             audio.error();
           }
           break;

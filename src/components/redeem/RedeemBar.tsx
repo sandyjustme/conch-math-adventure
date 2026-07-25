@@ -55,22 +55,26 @@ export default function RedeemBar() {
 
   const handleRedeem = async (tier: (typeof TIERS)[0]) => {
     if (pearls < tier.cost) return;
-    const code = `${tier.key}-${Date.now().toString(36)}`;
-    const pin = genPIN();
-    const url = buildVerifyUrl({
-      t: tier.name,
-      e: tier.emoji,
-      code,
-      pin,
-      cost: tier.cost,
-      ts: Date.now(),
-    });
-    const qrDataUrl = await QRCode.toDataURL(url, {
-      width: 220,
-      margin: 1,
-      color: { dark: "#1e293b", light: "#ffffff" },
-    });
-    setModal({ tier, code, pin, qrDataUrl });
+    try {
+      const code = `${tier.key}-${Date.now().toString(36)}`;
+      const pin = genPIN();
+      const url = buildVerifyUrl({
+        t: tier.name,
+        e: tier.emoji,
+        code,
+        pin,
+        cost: tier.cost,
+        ts: Date.now(),
+      });
+      const qrDataUrl = await QRCode.toDataURL(url, {
+        width: 220,
+        margin: 1,
+        color: { dark: "#1e293b", light: "#ffffff" },
+      });
+      setModal({ tier, code, pin, qrDataUrl });
+    } catch {
+      useStore.getState().showToast("fragment", 0);
+    }
   };
 
   const confirmRedeem = () => {

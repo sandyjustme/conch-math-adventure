@@ -1,6 +1,4 @@
 import { createServer } from "http";
-import { readFileSync } from "fs";
-import { resolve } from "path";
 
 const PORT = process.env.PORT || 3456;
 

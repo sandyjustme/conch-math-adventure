@@ -18,8 +18,7 @@ export default function VerifyPage() {
             二维码无效
           </h1>
           <p className="text-sm text-slate-500">
-            这个码可能已损坏或不是海螺咖啡馆的兑换码，请让顾客在 App
-            里重新生成。
+            这个码可能已损坏或不是喵喵趣学的兑换码，请让顾客在 App 里重新生成。
           </p>
         </div>
       </div>
@@ -31,7 +30,7 @@ export default function VerifyPage() {
       <header className="flex items-center gap-2 py-4">
         <Mascot size={28} />
         <h1 className="font-display text-lg text-ocean-deep">
-          海螺咖啡馆 · 兑换核销
+          喵喵趣学 · 兑换核销
         </h1>
       </header>
 

@@ -7,12 +7,10 @@ import {
   scheduleSneakAttack,
   getSneakReward,
 } from "../engine/spacedRepetition";
-import { isMastered } from "../engine/levelManager";
 import type { SneakAttack } from "../types";
 
 export function useSneakAttacks() {
   const masteredNodes = useStore((s) => s.masteredNodes);
-  const answerRecords = useStore((s) => s.answerRecords);
   const sneakAttacks = useStore((s) => s.sneakAttacks);
   const setSneakAttacks = useStore((s) => s.setSneakAttacks);
   const updateSneakAttack = useStore((s) => s.updateSneakAttack);
@@ -20,15 +18,19 @@ export function useSneakAttacks() {
   const addFragments = useStore((s) => s.addFragments);
 
   useEffect(() => {
-    for (const nodeId of masteredNodes) {
-      const existing = sneakAttacks.find((a) => a.nodeId === nodeId);
-      if (!existing) {
-        const attack = scheduleSneakAttack(nodeId, 0, Date.now());
-        setSneakAttacks([...sneakAttacks, attack]);
+    setSneakAttacks((prev) => {
+      let next = prev;
+      for (const nodeId of masteredNodes) {
+        const existing = next.find((a) => a.nodeId === nodeId);
+        if (!existing) {
+          next = [...next, scheduleSneakAttack(nodeId, 0, Date.now())];
+        }
       }
-    }
+      return next;
+    });
 
-    for (const attack of sneakAttacks) {
+    const state = useStore.getState();
+    for (const attack of state.sneakAttacks) {
       if (!masteredNodes.includes(attack.nodeId)) {
         removeSneakAttack(attack.nodeId);
       }

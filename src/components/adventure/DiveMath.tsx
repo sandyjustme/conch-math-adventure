@@ -9,7 +9,6 @@ import {
   readout,
   signed,
   type NodeId,
-  type Step,
 } from "../../data/diveTasks";
 
 /**
@@ -37,7 +36,13 @@ function beep(freq: number, on: boolean) {
   if (!on) return;
   try {
     _ac =
-      _ac || new (window.AudioContext || (window as any).webkitAudioContext)();
+      _ac ||
+      new (
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext ||
+        AudioContext
+      )();
     const o = _ac.createOscillator();
     const g = _ac.createGain();
     o.frequency.value = freq;
@@ -56,6 +61,8 @@ function beep(freq: number, on: boolean) {
 export default function DiveMath() {
   const setView = useStore((s) => s.setView);
   const addFragments = useStore((s) => s.addFragments);
+  const addPearls = useStore((s) => s.addPearls);
+  const addPlayTokens = useStore((s) => s.addPlayTokens);
   const addAnswerRecord = useStore((s) => s.addAnswerRecord);
   const showToast = useStore((s) => s.showToast);
   const sfxEnabled = useStore((s) => s.sfxEnabled);
@@ -83,7 +90,6 @@ export default function DiveMath() {
     try {
       return localStorage.getItem("diveIntroSeen") !== "1";
     } catch {
-      /* Web Audio 静默失败 */
       return true;
     }
   });
@@ -92,7 +98,6 @@ export default function DiveMath() {
     try {
       localStorage.setItem("diveIntroSeen", "1");
     } catch {
-      /* Web Audio 静默失败 */
       /* 忽略 */
     }
   };
@@ -100,11 +105,9 @@ export default function DiveMath() {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const dragging = useRef(false);
 
-  const task = tasks[Math.min(levelIdx, tasks.length - 1)];
-  const steps = task.steps;
-  const step = steps[stepIdx];
-  const answer = steps[steps.length - 1].to;
-
+  const task = tasks[Math.min(levelIdx, Math.max(0, tasks.length - 1))];
+  const steps = task?.steps;
+  const step = steps?.[stepIdx];
   const beginLevel = (idx: number) => {
     setLevelIdx(idx);
     setStepIdx(0);
@@ -126,7 +129,8 @@ export default function DiveMath() {
   }, [diveFocus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const yToValue = (clientY: number) => {
-    const rect = svgRef.current!.getBoundingClientRect();
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return 0;
     const localY = (clientY - rect.top) * (VBH / rect.height);
     let v = MAX - (localY - PAD_TOP) / UNIT;
     v = Math.round(v);
@@ -144,12 +148,14 @@ export default function DiveMath() {
       if (stepIdx === steps.length - 1) {
         setPhase("done");
         // 答错倒扣 + 倍率计算
-        const base = Math.max(0, 1 - wrongCount * 0.1);
-        const fromAdventure = diveFromAdventure ? 1 : 0.2;
+        const base = Math.max(0, 1 - wrongCount * 0.2);
+        const fromAdventure = diveFromAdventure ? 1.5 : 1.0;
         const globalMult = getGlobalMultiplier(todayAdventureCount);
         const final = Math.floor(base * fromAdventure * globalMult);
         if (final > 0) {
           addFragments(final);
+          addPearls(1);
+          addPlayTokens(2);
           showToast("fragment", final);
         }
         addAnswerRecord({
@@ -189,6 +195,39 @@ export default function DiveMath() {
 
   const ticks: number[] = [];
   for (let i = MIN; i <= MAX; i++) ticks.push(i);
+
+  if (!task) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-ocean-shimmer px-6 text-center">
+        <div className="text-5xl mb-4">🐚</div>
+        <h2 className="font-display text-2xl text-stone-600 mb-2">
+          这片海域还没有题目
+        </h2>
+        <button
+          onClick={() => setView("cafe")}
+          className="px-6 py-3 rounded-full bg-teal-500 text-white font-bold text-sm"
+        >
+          回咖啡馆
+        </button>
+      </div>
+    );
+  }
+  if (!steps || steps.length === 0 || !step) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-ocean-shimmer px-6 text-center">
+        <div className="text-5xl mb-4">🐚</div>
+        <h2 className="font-display text-2xl text-stone-600 mb-2">
+          这道题还没有步骤
+        </h2>
+        <button
+          onClick={() => setView("cafe")}
+          className="px-6 py-3 rounded-full bg-teal-500 text-white font-bold text-sm"
+        >
+          回咖啡馆
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full font-body bg-ocean-shimmer">

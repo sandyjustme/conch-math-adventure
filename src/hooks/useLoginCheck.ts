@@ -1,27 +1,28 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import useStore from "../store/useStore";
 
-export function useLoginCheck() {
-  const lastLoginDate = useStore((s) => s.lastLoginDate);
-  const consecutiveDays = useStore((s) => s.consecutiveDays);
-  const setLastLogin = useStore((s) => s.setLastLogin);
-  const setConsecutiveDays = useStore((s) => s.setConsecutiveDays);
-  const addFragments = useStore((s) => s.addFragments);
+export function useLoginCheck(loaded: boolean) {
+  const ranRef = useRef(false);
 
   useEffect(() => {
+    if (!loaded || ranRef.current) return;
+    ranRef.current = true;
+
     const today = new Date().toISOString().slice(0, 10);
+    const state = useStore.getState();
+    const lastLoginDate = state.lastLoginDate;
+    const consecutiveDays = state.consecutiveDays;
 
     if (!lastLoginDate) {
-      setLastLogin(today);
-      setConsecutiveDays(1);
-      addFragments(1);
+      state.setLastLogin(today);
+      state.setConsecutiveDays(1);
+      state.addFragments(1);
       return;
     }
 
     if (lastLoginDate === today) return;
 
-    // 跨天重置今日探险计数
-    useStore.getState().resetAdventureCount();
+    state.resetAdventureCount();
 
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
@@ -29,16 +30,16 @@ export function useLoginCheck() {
 
     if (lastLoginDate === yesterdayStr) {
       const newCount = consecutiveDays + 1;
-      setConsecutiveDays(newCount);
-      addFragments(1);
+      state.setConsecutiveDays(newCount);
+      state.addFragments(1);
       if (newCount === 7) {
-        useStore.getState().addPearls(1);
+        state.addPearls(1);
       }
     } else {
-      setConsecutiveDays(1);
-      addFragments(1);
+      state.setConsecutiveDays(1);
+      state.addFragments(1);
     }
 
-    setLastLogin(today);
-  }, []);
+    state.setLastLogin(today);
+  }, [loaded]);
 }

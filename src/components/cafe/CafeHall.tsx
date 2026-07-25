@@ -146,10 +146,14 @@ export default function CafeHall() {
   const canRedeem = pearls >= EXCHANGE_RATE;
   const nav = (v: View) => () => setView(v);
 
+  const playTokens = useStore((s) => s.playTokens);
   const multiplier =
-    todayAdventureCount >= 2 ? 2.0 : todayAdventureCount >= 1 ? 1.5 : 0.5;
+    todayAdventureCount === 0 ? 0.5 : 1.0 + (todayAdventureCount - 1) * 0.3;
+  const nextMult = 1.0 + todayAdventureCount * 0.3;
   const multiplierLabel =
-    multiplier >= 2 ? "🎉 ×2.0" : multiplier >= 1.5 ? "🔥 ×1.5" : "🎯 ×0.5";
+    todayAdventureCount === 0
+      ? "🎯 ×0.5"
+      : `🔥 ×${multiplier.toFixed(1)} · 再过1关 → ×${nextMult.toFixed(1)}`;
 
   // 间隔偷袭
   const { dueAttacks, handleSneakSuccess } = useSneakAttacks();
@@ -232,22 +236,29 @@ export default function CafeHall() {
           </div>
         )}
 
-        {/* 全局倍率横幅 */}
+        {/* 全局倍率横幅 + 游戏次数 */}
         <div className="px-4 mb-4 max-w-md md:max-w-lg mx-auto">
           <div
-            className={`rounded-2xl px-4 py-2.5 text-center text-sm font-bold transition ${
-              multiplier >= 2
+            className={`rounded-2xl px-4 py-2.5 flex items-center justify-between text-sm font-bold transition ${
+              todayAdventureCount >= 2
                 ? "bg-amber-100 text-amber-700 border border-amber-300"
-                : multiplier >= 1.5
+                : todayAdventureCount >= 1
                   ? "bg-teal-50 text-teal-700 border border-teal-200"
                   : "bg-slate-100 text-slate-500 border border-slate-200"
             }`}
           >
-            {multiplier >= 2
-              ? "🎉 已过 2 关！所有活动碎片 ×2.0（最高）"
-              : multiplier >= 1.5
-                ? "🔥 已过 1 关！所有活动碎片 ×1.5"
-                : "🎯 今天还没探险哦！所有活动碎片 ×0.5"}
+            <span>{multiplierLabel}</span>
+            <span
+              className={`rounded-full px-3 py-0.5 text-xs font-bold ${
+                playTokens > 3
+                  ? "bg-amber-400 text-white"
+                  : playTokens > 0
+                    ? "bg-teal-400 text-white"
+                    : "bg-slate-300 text-slate-500"
+              }`}
+            >
+              🎮 {playTokens} 次
+            </span>
           </div>
         </div>
 
@@ -273,7 +284,7 @@ export default function CafeHall() {
             </div>
           </div>
           <h1 className="font-display text-3xl text-stone-700 mb-1">
-            海螺咖啡馆
+            喵喵趣学
           </h1>
           <p className="text-sm text-stone-500">{greeting}</p>
           <div className="mt-3 flex items-center justify-center gap-3">
@@ -332,13 +343,18 @@ export default function CafeHall() {
             </h2>
             <div className="grid grid-cols-2 gap-2.5">
               <Card
-                emoji="🎮"
+                emoji={playTokens > 0 ? "🎮" : "🔒"}
                 title="游戏角"
-                desc="2 个小游戏练反应"
+                desc={
+                  playTokens > 0
+                    ? `消耗1次 · 还剩${playTokens}次`
+                    : "去探险赚游戏次数吧～"
+                }
+                badge={playTokens > 0 ? "🎮 -1次" : undefined}
                 accent="gold"
                 delay={170}
                 onClick={nav("games")}
-                locked={isLocked("games")}
+                locked={isLocked("games") || playTokens <= 0}
               />
               <Card
                 emoji="🗺️"
@@ -451,14 +467,17 @@ export default function CafeHall() {
             <div className="space-y-4">
               <section>
                 <h3 className="text-sm font-bold text-ocean-surface mb-2">
-                  🌟 碎片怎么赚
+                  🌟 碎片/珍珠怎么赚
                 </h3>
                 <div className="space-y-1.5 text-xs text-slate-600">
-                  <p>💬 今日探险每轮对话 +0.5 碎片</p>
+                  <p>💬 今日探险每轮对话 +0.2 碎片</p>
                   <p>🤔 真正想通一步 +2 碎片 +1 珍珠</p>
-                  <p>🏁 聊通一个知识点 +3 碎片</p>
-                  <p>🏊 潜水算术过关 +1 碎片（答错会扣）</p>
-                  <p>🎮 游戏角按得分结算碎片</p>
+                  <p>🏁 聊通一个知识点 +3 碎片 +3次游戏</p>
+                  <p>🏊 潜水算术过关 +1 珍珠 +2次游戏</p>
+                  <p>🎮 游戏角按算式得分结算碎片（0分=0）</p>
+                  <p>🐢 海龟汤首次破解 +5 珍珠 +3次游戏</p>
+                  <p>🗺️ 藏宝图每掌握1个知识点 +2 珍珠</p>
+                  <p>📅 每日签到 +1 碎片，连续7天 +1 珍珠</p>
                 </div>
               </section>
 
@@ -467,10 +486,21 @@ export default function CafeHall() {
                   📈 倍率怎么算
                 </h3>
                 <div className="space-y-1.5 text-xs text-slate-600">
-                  <p>🎯 今天没聊通关 → 所有活动 ×0.5</p>
-                  <p>🔥 聊通 1 关 → 所有活动 ×1.5</p>
-                  <p>🎉 聊通 2+ 关 → 所有活动 ×2.0</p>
-                  <p>🐱 从今日探险直接跳转 → 全额碎片</p>
+                  <p>🎯 今天还没探险 → 所有活动 ×0.5</p>
+                  <p>🔥 每聊通1关 +0.3 倍率（上不封顶）</p>
+                  <p>🐱 从今日探险跳转潜水 → 更高收益</p>
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-sm font-bold text-violet-600 mb-2">
+                  🎮 游戏次数怎么获得
+                </h3>
+                <div className="space-y-1.5 text-xs text-slate-600">
+                  <p>探险过1关 +3次 · 潜水算术 +2次</p>
+                  <p>规则怪谈答对 +1次 · 海龟汤破解 +3次</p>
+                  <p>每日登录送 +2次 · 上限 10 次</p>
+                  <p>海底跳跃/贝壳收集每次消耗 1 次</p>
                 </div>
               </section>
 
@@ -479,9 +509,10 @@ export default function CafeHall() {
                   ⚠️ 答错扣减
                 </h3>
                 <div className="space-y-1.5 text-xs text-slate-600">
-                  <p>🤿 潜水算术每答错 1 次 → 扣 0.1 碎片</p>
-                  <p>💀 答错 10 次 → 过关 0 碎片</p>
-                  <p>🪦 古深海遗迹放错 → 圆弹回重试</p>
+                  <p>🤿 潜水算术每答错 1 次 → 扣 0.2 碎片</p>
+                  <p>💀 答错 5 次 → 过关 0 碎片</p>
+                  <p>📜 规则怪谈选错 → 不可重选，直接跳过</p>
+                  <p>🐢 看过汤底再玩 → 不再给奖励</p>
                 </div>
               </section>
             </div>
@@ -509,7 +540,7 @@ export default function CafeHall() {
             <div className="text-center mb-4">
               <Mascot size={56} />
               <h2 className="font-display text-xl text-stone-700 mt-2">
-                欢迎来到海螺咖啡馆！
+                欢迎来到喵喵趣学！
               </h2>
               <p className="text-xs text-stone-500 mt-1">
                 我是海小喵，你的数学探险伙伴～

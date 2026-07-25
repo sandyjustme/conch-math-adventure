@@ -24,6 +24,10 @@ interface AppState {
   gameScores: GameScore[];
   redemptions: Redemption[];
 
+  playTokens: number;
+  solvedSoups: string[];
+  revealedSoups: string[];
+
   ttsEnabled: boolean;
   sttEnabled: boolean;
   bgmEnabled: boolean;
@@ -64,12 +68,19 @@ interface AppState {
   masterNode: (id: string) => void;
   addAnswerRecord: (record: AnswerRecord) => void;
 
-  setSneakAttacks: (attacks: SneakAttack[]) => void;
+  setSneakAttacks: (
+    attacks: SneakAttack[] | ((prev: SneakAttack[]) => SneakAttack[])
+  ) => void;
   updateSneakAttack: (attack: SneakAttack) => void;
   removeSneakAttack: (nodeId: string) => void;
 
   addGameScore: (score: GameScore) => void;
   addRedemption: (r: Redemption) => void;
+
+  addPlayTokens: (n: number) => void;
+  spendPlayTokens: (n: number) => boolean;
+  addSolvedSoup: (id: string) => void;
+  addRevealedSoup: (id: string) => void;
 
   toggleTts: () => void;
   toggleStt: () => void;
@@ -115,6 +126,10 @@ const useStore = create<AppState>((set) => ({
   gameScores: [],
   redemptions: [],
 
+  playTokens: 2,
+  solvedSoups: [],
+  revealedSoups: [],
+
   ttsEnabled: true,
   sttEnabled: true,
   bgmEnabled: true,
@@ -138,7 +153,7 @@ const useStore = create<AppState>((set) => ({
   todayAdventureCount: 0,
   incrementAdventureCount: () =>
     set((s) => ({
-      todayAdventureCount: Math.min(2, s.todayAdventureCount + 1),
+      todayAdventureCount: s.todayAdventureCount + 1,
     })),
   resetAdventureCount: () => set({ todayAdventureCount: 0 }),
 
@@ -173,7 +188,11 @@ const useStore = create<AppState>((set) => ({
       return { answerRecords: next };
     }),
 
-  setSneakAttacks: (attacks) => set({ sneakAttacks: attacks }),
+  setSneakAttacks: (attacks) =>
+    set((s) => ({
+      sneakAttacks:
+        typeof attacks === "function" ? attacks(s.sneakAttacks) : attacks,
+    })),
   updateSneakAttack: (attack) =>
     set((s) => ({
       sneakAttacks: s.sneakAttacks.map((a) =>
@@ -188,6 +207,27 @@ const useStore = create<AppState>((set) => ({
   addGameScore: (score) =>
     set((s) => ({ gameScores: [...s.gameScores, score] })),
   addRedemption: (r) => set((s) => ({ redemptions: [...s.redemptions, r] })),
+
+  addPlayTokens: (n) =>
+    set((s) => ({ playTokens: Math.min(10, s.playTokens + n) })),
+  spendPlayTokens: (n) => {
+    const state = useStore.getState();
+    if (state.playTokens < n) return false;
+    set({ playTokens: state.playTokens - n });
+    return true;
+  },
+  addSolvedSoup: (id) =>
+    set((s) => ({
+      solvedSoups: s.solvedSoups.includes(id)
+        ? s.solvedSoups
+        : [...s.solvedSoups, id],
+    })),
+  addRevealedSoup: (id) =>
+    set((s) => ({
+      revealedSoups: s.revealedSoups.includes(id)
+        ? s.revealedSoups
+        : [...s.revealedSoups, id],
+    })),
 
   toggleTts: () => set((s) => ({ ttsEnabled: !s.ttsEnabled })),
   toggleStt: () => set((s) => ({ sttEnabled: !s.sttEnabled })),

@@ -2,80 +2,77 @@ let audioCtx: AudioContext | null = null;
 
 function getCtx(): AudioContext {
   if (!audioCtx) audioCtx = new AudioContext();
+  if (audioCtx.state === "suspended") audioCtx.resume();
   return audioCtx;
 }
 
-export function playTone(
+function playTone(
   freq: number,
   duration: number,
-  type: OscillatorType = "sine"
+  type: OscillatorType = "sine",
+  startTime?: number
 ) {
   const ctx = getCtx();
+  const t = startTime ?? ctx.currentTime;
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = type;
   osc.frequency.value = freq;
-  gain.gain.setValueAtTime(0.3, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+  gain.gain.setValueAtTime(0.22, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
   osc.connect(gain);
   gain.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + duration);
+  osc.start(t);
+  osc.stop(t + duration);
 }
 
+/** 答对 — 清脆三角铁 + 延音 */
 export function sfxCorrect() {
-  playTone(523, 0.1);
-  setTimeout(() => playTone(659, 0.1), 100);
-  setTimeout(() => playTone(784, 0.15), 200);
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+  playTone(880, 0.12, "triangle", t);
+  playTone(1100, 0.15, "triangle", t + 0.06);
 }
 
+/** 收集 — 轻快的叮 */
 export function sfxCollect() {
-  playTone(880, 0.08, "triangle");
+  playTone(1047, 0.1, "triangle");
 }
 
+/** 获得珍珠 — 叠音宝石落地感 */
 export function sfxPearl() {
-  playTone(1047, 0.12, "sine");
-  setTimeout(() => playTone(1319, 0.2, "sine"), 120);
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+  playTone(1319, 0.1, "sine", t);
+  playTone(1568, 0.15, "sine", t + 0.06);
+  playTone(1760, 0.18, "sine", t + 0.12);
 }
 
+/** 答错 — 柔和降调（不刺耳） */
 export function sfxError() {
-  playTone(200, 0.15, "square");
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+  playTone(330, 0.12, "triangle", t);
+  playTone(260, 0.15, "triangle", t + 0.1);
 }
 
+/** 过关/升级 — 8音阶上行旋律 + 结尾和弦（1.5s） */
 export function sfxLevelUp() {
-  const notes = [523, 659, 784, 1047];
-  notes.forEach((n, i) => setTimeout(() => playTone(n, 0.15), i * 120));
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+  const notes = [523, 587, 659, 698, 784, 880, 988, 1047];
+  notes.forEach((n, i) => playTone(n, 0.12, "sine", t + i * 0.08));
+  playTone(1047, 0.3, "triangle", t + notes.length * 0.08);
+  playTone(1319, 0.3, "triangle", t + notes.length * 0.08 + 0.05);
 }
 
-/* 浏览器自带语音朗读（免费，Chrome 用）*/
-let speaking = false;
-export function speakText(text: string): Promise<void> {
-  return new Promise((resolve) => {
-    if (!window.speechSynthesis) {
-      resolve();
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text.slice(0, 200));
-    u.lang = "zh-CN";
-    u.rate = 0.95;
-    u.pitch = 1.1;
-    u.onend = () => {
-      speaking = false;
-      resolve();
-    };
-    u.onerror = () => {
-      speaking = false;
-      resolve();
-    };
-    speaking = true;
-    window.speechSynthesis.speak(u);
-  });
-}
-export function stopSpeak() {
-  window.speechSynthesis?.cancel();
-  speaking = false;
-}
-export function isSpeaking() {
-  return speaking;
+/** 里程碑庆典 — 3秒完整旋律 */
+export function sfxCelebration() {
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+  const fanfare = [523, 659, 784, 1047, 784, 1047, 1319, 1568];
+  fanfare.forEach((n, i) => playTone(n, 0.18, "sine", t + i * 0.12));
+  playTone(1568, 0.5, "triangle", t + fanfare.length * 0.12);
+  playTone(1319, 0.5, "triangle", t + fanfare.length * 0.12 + 0.05);
+  playTone(1047, 0.5, "triangle", t + fanfare.length * 0.12 + 0.1);
 }

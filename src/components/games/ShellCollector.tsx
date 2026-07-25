@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import useStore from "../../store/useStore";
 import { getGlobalMultiplier } from "../../engine/rewardEngine";
+import { generateExpressions } from "../../data/expressionGenerator";
 import { useAudio } from "../../hooks/useAudio";
 import Mascot from "../shared/Mascot";
 
@@ -15,6 +16,7 @@ interface Pearl {
   x: number;
   y: number;
   value: number;
+  text: string;
   size: number;
   caught: boolean;
 }
@@ -23,6 +25,9 @@ export default function ShellCollector() {
   const addFragments = useStore((s) => s.addFragments);
   const showToast = useStore((s) => s.showToast);
   const todayAdventureCount = useStore((s) => s.todayAdventureCount);
+  const currentNodeId = useStore((s) => s.currentNodeId);
+  const masteredNodes = useStore((s) => s.masteredNodes);
+  const spendPlayTokens = useStore((s) => s.spendPlayTokens);
   const audio = useAudio();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -42,6 +47,10 @@ export default function ShellCollector() {
   });
 
   const startGame = useCallback(() => {
+    if (!spendPlayTokens(1)) {
+      showToast("fragment", 0);
+      return;
+    }
     const s = g.current;
     s.score = 0;
     s.misses = 0;
@@ -54,7 +63,8 @@ export default function ShellCollector() {
     setMisses(0);
     setTimeLeft(30);
     setResult(null);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spendPlayTokens, currentNodeId, masteredNodes]);
 
   useEffect(() => {
     if (!playing) return;
@@ -72,7 +82,7 @@ export default function ShellCollector() {
 
       if (remaining <= 0) {
         const mult = getGlobalMultiplier(todayAdventureCount);
-        const earned = Math.floor(Math.max(1, Math.floor(s.score / 2)) * mult);
+        const earned = Math.max(0, Math.floor((s.score / 2) * mult));
         addFragments(earned);
         if (earned > 0) showToast("fragment", earned);
         setResult(
@@ -86,11 +96,14 @@ export default function ShellCollector() {
 
       if (elapsed - s.lastSpawn > 1000 + Math.random() * 600) {
         s.lastSpawn = elapsed;
+        const exprs = generateExpressions(currentNodeId, masteredNodes, 1);
+        const expr = exprs[0] || { text: "1+1", value: 2 };
         s.pearls.push({
           x: randomInt(40, W - 40),
           y: -20,
-          value: randomInt(-8, 8),
-          size: randomInt(12, 22),
+          value: expr.value,
+          text: expr.text,
+          size: Math.min(22, 12 + Math.abs(expr.text.length) * 1.2),
           caught: false,
         });
       }
@@ -170,7 +183,7 @@ export default function ShellCollector() {
         ctx.font = `bold ${Math.max(10, p.size * 0.8)}px "Noto Sans SC", sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(String(p.value), p.x, p.y);
+        ctx.fillText(p.text, p.x, p.y);
       }
 
       // Remove caught
@@ -211,8 +224,8 @@ export default function ShellCollector() {
             setScore(g.current.score);
             audio.collect();
           } else {
-            g.current.misses++;
-            setMisses(g.current.misses);
+            g.current.score = Math.max(0, g.current.score - 1);
+            setScore(g.current.score);
             audio.error();
           }
           break;

@@ -25,8 +25,8 @@ export default function App() {
     runValidation();
     runDiveTasksValidation();
   }, []);
-  usePersistence();
-  useLoginCheck();
+  const loaded = usePersistence();
+  useLoginCheck(loaded);
   useHashRouting();
 
   const [showTest, setShowTest] = useState(() => {

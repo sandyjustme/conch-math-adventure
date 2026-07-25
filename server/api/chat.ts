@@ -33,7 +33,7 @@ export async function handler(req: Request): Promise<Response> {
       status: response.status,
       headers: { "Content-Type": "application/json" },
     });
-  } catch (e) {
+  } catch {
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

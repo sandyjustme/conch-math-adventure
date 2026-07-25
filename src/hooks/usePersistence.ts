@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import useStore from "../store/useStore";
 
 const DB_NAME = "conch-math";
@@ -54,6 +54,11 @@ export function usePersistence() {
   const sneakAttacks = useStore((s) => s.sneakAttacks);
   const redemptions = useStore((s) => s.redemptions);
   const diagnosticsCompleted = useStore((s) => s.diagnosticsCompleted);
+  const playTokens = useStore((s) => s.playTokens);
+  const solvedSoups = useStore((s) => s.solvedSoups);
+  const revealedSoups = useStore((s) => s.revealedSoups);
+  const loadedRef = useRef(false);
+  const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -76,10 +81,28 @@ export function usePersistence() {
       if (shells2) useStore.setState({ rareShells: shells2 });
       const diag = await getItem("diagnosticsCompleted");
       if (diag === true) useStore.setState({ diagnosticsCompleted: true });
+      const loginDate = await getItem("lastLoginDate");
+      if (typeof loginDate === "string")
+        useStore.setState({ lastLoginDate: loginDate });
+      const consDays = await getItem("consecutiveDays");
+      if (typeof consDays === "number")
+        useStore.setState({ consecutiveDays: consDays });
+      const tokens = await getItem("playTokens");
+      if (typeof tokens === "number") useStore.setState({ playTokens: tokens });
+      const ss = await getItem("solvedSoups");
+      if (Array.isArray(ss)) useStore.setState({ solvedSoups: ss });
+      const rs = await getItem("revealedSoups");
+      if (Array.isArray(rs)) useStore.setState({ revealedSoups: rs });
     } catch (e) {
       console.error("Failed to load state:", e);
+    } finally {
+      loadedRef.current = true;
+      setLoaded(true);
     }
   }, []);
+
+  const lastLoginDate = useStore((s) => s.lastLoginDate);
+  const consecutiveDays = useStore((s) => s.consecutiveDays);
 
   const save = useCallback(async () => {
     try {
@@ -90,6 +113,11 @@ export function usePersistence() {
       await setItem("redemptions", redemptions);
       await setItem("rareShells", rareShells);
       await setItem("diagnosticsCompleted", diagnosticsCompleted);
+      await setItem("lastLoginDate", lastLoginDate);
+      await setItem("consecutiveDays", consecutiveDays);
+      await setItem("playTokens", playTokens);
+      await setItem("solvedSoups", solvedSoups);
+      await setItem("revealedSoups", revealedSoups);
     } catch (e) {
       console.error("Failed to save state:", e);
     }
@@ -102,14 +130,22 @@ export function usePersistence() {
     redemptions,
     rareShells,
     diagnosticsCompleted,
+    lastLoginDate,
+    consecutiveDays,
+    playTokens,
+    solvedSoups,
+    revealedSoups,
   ]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   useEffect(() => {
+    if (!loadedRef.current) return;
     const timer = setTimeout(save, 500);
     return () => clearTimeout(timer);
   }, [fragments, pearls, masteredNodes.length, save]);
+
+  return loaded;
 }

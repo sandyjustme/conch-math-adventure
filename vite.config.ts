@@ -12,8 +12,8 @@ export default defineConfig(({ mode }) => {
         registerType: "autoUpdate",
         includeAssets: ["mascot.png"],
         manifest: {
-          name: "海螺咖啡馆 · 数学探险",
-          short_name: "海螺咖啡馆",
+          name: "喵喵趣学",
+          short_name: "喵喵趣学",
           description: "海底探险主题的数学学习游戏",
           theme_color: "#0F3050",
           background_color: "#FFF4E6",

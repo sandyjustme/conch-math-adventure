@@ -22,6 +22,13 @@ function rateLimited(ip) {
   rec.count += 1;
   return rec.count > RATE_LIMIT;
 }
+// 每 5 分钟清理过期条目，防止 Map 无限增长
+setInterval(() => {
+  const cutoff = Date.now() - RATE_WINDOW_MS;
+  for (const [ip, rec] of hits) {
+    if (rec.start < cutoff) hits.delete(ip);
+  }
+}, 300_000).unref();
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -69,6 +76,7 @@ function proxyDeepseek(req, res) {
           Authorization: `Bearer ${API_KEY}`,
         },
         body: raw,
+        signal: AbortSignal.timeout(30_000),
       });
       const data = await response.text();
       res.setHeader("Content-Type", "application/json");
@@ -98,6 +106,7 @@ function proxyTts(req, res) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(15_000),
           body: JSON.stringify({
             app: {
               appid: TTS_APP_ID,
@@ -106,7 +115,7 @@ function proxyTts(req, res) {
             },
             user: { uid: "conch-student" },
             audio: {
-              voice_type: "zh_female_qingxin",
+              voice_type: "zh_female_tianmei",
               encoding: "mp3",
               speed_ratio: 0.9,
             },
@@ -151,5 +160,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`海螺咖啡馆 · 服务器已启动 → http://localhost:${PORT}`);
+  console.log(`喵喵趣学 · 服务器已启动 → http://localhost:${PORT}`);
 });

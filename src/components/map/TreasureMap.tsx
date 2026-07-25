@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import useStore from "../../store/useStore";
 import { NODES, NODE_MAP } from "../../data/knowledgeGraph";
 import { getNodeStatus } from "../../engine/levelManager";
@@ -8,6 +9,16 @@ export default function TreasureMap() {
   const masteredNodes = useStore((s) => s.masteredNodes);
   const currentNodeId = useStore((s) => s.currentNodeId);
   const answerRecords = useStore((s) => s.answerRecords);
+  const lastCount = useRef(masteredNodes.length);
+
+  useEffect(() => {
+    if (masteredNodes.length > lastCount.current) {
+      const gained = (masteredNodes.length - lastCount.current) * 2;
+      useStore.getState().addPearls(gained);
+      useStore.getState().showToast("pearl", gained);
+      lastCount.current = masteredNodes.length;
+    }
+  }, [masteredNodes.length]);
 
   const chapterNodes = NODES.filter((n) => n.chapter === "有理数");
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import useStore from "../../store/useStore";
 import { getGlobalMultiplier } from "../../engine/rewardEngine";
-import { speakText } from "../../services/audio";
+import { speak } from "../../services/tts";
 
 /**
  * 分数珍珠 —— 古深海遗迹的第一个试点原型。
@@ -166,7 +166,8 @@ export default function FractionPearls() {
 
   // 把屏幕坐标转成 SVG viewBox 坐标
   const toSVG = (clientX: number, clientY: number) => {
-    const rect = svgRef.current!.getBoundingClientRect();
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
     return {
       x: (clientX - rect.left) * (VBW / rect.width),
       y: (clientY - rect.top) * (VBH / rect.height),
@@ -205,7 +206,7 @@ export default function FractionPearls() {
       }
       // TTS 朗读过关小结
       setTtsPlaying(true);
-      speakText(lv.recap).finally(() => setTtsPlaying(false));
+      speak(lv.recap).finally(() => setTtsPlaying(false));
       addAnswerRecord({
         nodeId: "K1",
         correct: true,
