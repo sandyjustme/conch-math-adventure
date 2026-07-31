@@ -5,6 +5,11 @@ module.exports = {
     {
       name: "conch",
       script: "serve.cjs",
+      // PM2 直接起 serve.cjs，不走 npm start —— 必须在这里传 env-file，
+      // 否则 DEEPSEEK_API_KEY / VOLCANO_TTS_* 读不到，TTS 在线上静默失效。
+      // 用 if-exists 版本：.env 缺失时不报错启动失败，只是没有凭据。
+      // 需要 Node ≥ 20.12。
+      node_args: "--env-file-if-exists=.env",
       env: {
         PORT: 3000,
         NODE_ENV: "production",
