@@ -37,7 +37,7 @@ export async function handler(req: Request): Promise<Response> {
         // 选甜美小源：甜的声线念渗人的内容，反差本身就是恐怖手法。
         voice_type: "zh_female_tianmeixiaoyuan_moon_bigtts",
         encoding: "mp3",
-        speed_ratio: 0.9,
+        speed_ratio: 1.15, // 孩子嫌慢，实测 0.9 会让他拼命点屏幕跳过
       },
       request: {
         // reqid 必填，火山用它做请求去重与排查

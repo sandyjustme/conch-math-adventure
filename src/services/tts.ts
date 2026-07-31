@@ -92,6 +92,13 @@ export const ttsDiag = {
 const SILENT_WAV =
   "data:audio/wav;base64,UklGRiQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
 
+/**
+ * 朗读代数。每次 stopSegment（她点屏幕跳过、离开页面）就 +1。
+ * 在飞的请求回来后先比对代数，过期的一律不播 ——
+ * 否则孩子连点几下，几个请求先后返回会把声音叠在一起。
+ */
+let generation = 0;
+
 let player: HTMLAudioElement | null = null;
 
 function getPlayer(): HTMLAudioElement {
@@ -127,11 +134,13 @@ export function unlockAudio(): void {
  */
 async function speakViaBrowser(
   text: string,
-  onPlaying?: () => void
+  onPlaying?: () => void,
+  myGen = generation
 ): Promise<boolean> {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     return false;
   }
+  if (myGen !== generation) return false;
 
   const started = performance.now();
   const ended = await new Promise<boolean>((resolve) => {
@@ -154,7 +163,7 @@ async function speakViaBrowser(
 
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "zh-CN";
-    u.rate = 0.95;
+    u.rate = 1.15; // 与火山语速一致，孩子嫌慢
     u.onstart = () => onPlaying?.();
     u.onend = () => done(true);
     u.onerror = () => done(false);
@@ -190,6 +199,7 @@ export async function speakSegment(
 ): Promise<boolean> {
   if (!text.trim()) return false;
   stopSegment();
+  const myGen = generation;
 
   // 画面上保留 −7 这个数学符号，送去朗读的转成「负7」。
   // 不转的话 TTS 会按运算符读成「减七」，等于把负数概念教反了。
@@ -212,6 +222,7 @@ export async function speakSegment(
         // 网络卡住时别让整个播放器跟着挂起
         signal: AbortSignal.timeout(8000),
       });
+      if (myGen !== generation) return false; // 请求还在飞时她已经点走了
       if (response.ok) {
         const blob = await response.blob();
         ttsDiag.fetchMs = Math.round(performance.now() - t0);
@@ -219,6 +230,10 @@ export async function speakSegment(
         const url = URL.createObjectURL(blob);
         // 复用被手势解锁过的那个元素，不新建 —— 新建的没被解锁，
         // 第二拍起会被自动播放策略拦下
+        if (myGen !== generation) {
+          URL.revokeObjectURL(url);
+          return false;
+        }
         const audio = getPlayer();
         audio.src = url;
 
@@ -272,7 +287,8 @@ export async function speakSegment(
     }
   }
 
-  const ok = await speakViaBrowser(spoken, onPlaying);
+  if (myGen !== generation) return false;
+  const ok = await speakViaBrowser(spoken, onPlaying, myGen);
   ttsDiag.path += " → 浏览器语音";
   ttsDiag.result = ok ? "浏览器念完" : "两条路都不通";
   return ok;
@@ -280,8 +296,10 @@ export async function speakSegment(
 
 /** 打断当前段（她点了跳过 / 离开页面） */
 export function stopSegment(): void {
+  generation++; // 作废所有在飞的朗读，防止声音叠加
   if (player) {
     player.pause();
+    player.removeAttribute("src");
   }
   if (typeof window !== "undefined" && "speechSynthesis" in window) {
     window.speechSynthesis.cancel();
