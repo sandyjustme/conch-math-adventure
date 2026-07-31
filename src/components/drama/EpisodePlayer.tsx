@@ -39,8 +39,14 @@ export default function EpisodePlayer() {
   const [wasCorrect, setWasCorrect] = useState<boolean | null>(null);
   /** TTS 不可用时改为手动点继续 */
   const [manual, setManual] = useState(false);
-  /** 正在取音频：没有这个提示，等待期间屏幕不动又没声音，看起来像卡死 */
-  const [loadingAudio, setLoadingAudio] = useState(false);
+  /**
+   * 朗读状态。分成两级是为了能一眼看出卡在哪：
+   *   fetching  取音频中 —— 停住说明网络或代理有问题
+   *   playing   正在念   —— 停住且没声音说明播放被系统拦了
+   */
+  const [audioState, setAudioState] = useState<"idle" | "fetching" | "playing">(
+    "idle"
+  );
   const [unlockedSeason, setUnlockedSeason] = useState<number | null>(null);
   /** 用来作废过期的朗读回调（她跳过或离开时） */
   const runId = useRef(0);
@@ -112,7 +118,7 @@ export default function EpisodePlayer() {
     stopSegment();
     runId.current++;
     setManual(false);
-    setLoadingAudio(false);
+    setAudioState("idle");
 
     if (beatIdx < beats.length - 1) {
       setBeatIdx((i) => i + 1);
@@ -149,10 +155,12 @@ export default function EpisodePlayer() {
         setManual(true);
         return;
       }
-      setLoadingAudio(true);
-      const spoken = await speakSegment(beatText);
+      setAudioState("fetching");
+      const spoken = await speakSegment(beatText, () => {
+        if (!cancelled && myRun === runId.current) setAudioState("playing");
+      });
       if (cancelled || myRun !== runId.current) return;
-      setLoadingAudio(false);
+      setAudioState("idle");
       if (spoken) advanceBeat();
       else setManual(true); // TTS 挂了也要能往下走
     })();
@@ -359,10 +367,11 @@ export default function EpisodePlayer() {
           <span className="inline-block px-6 py-2.5 rounded-full bg-amber-400/90 text-slate-900 text-sm font-bold">
             点一下继续 →
           </span>
-        ) : loadingAudio ? (
+        ) : audioState !== "idle" ? (
           <span className="inline-flex items-center gap-2 text-[11px] text-slate-500">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-            正在念…
+            {audioState === "fetching" ? "取音频中…" : "正在念…"}
+            <span className="text-slate-700">· 点屏幕可跳过</span>
           </span>
         ) : (
           <span className="text-[11px] text-slate-600">

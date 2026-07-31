@@ -75,8 +75,12 @@ let volcanoDown = false;
    play 就不再受限。每拍新建 Audio 是行不通的，新元素没被解锁过。
    ────────────────────────────────────────── */
 
+/**
+ * 0.032 秒的真实静音采样（8kHz / 8bit / 单声道）。
+ * 不能用 0 字节音频数据的空 WAV —— iOS Safari 会直接拒绝，解锁不成立。
+ */
 const SILENT_WAV =
-  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=";
+  "data:audio/wav;base64,UklGRiQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
 
 let player: HTMLAudioElement | null = null;
 
@@ -97,9 +101,9 @@ export function unlockAudio(): void {
       /* 解锁失败就靠 speakViaBrowser 兜底 */
     });
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      // 同理解锁 Web Speech：在手势里发一条空 utterance
-      const u = new SpeechSynthesisUtterance("");
-      window.speechSynthesis.speak(u);
+      // 同理解锁 Web Speech。用一个空格而不是空串 —— 空串在 Safari 上
+      // 可能被直接丢弃，达不到解锁效果。
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(" "));
     }
   } catch {
     /* 解锁是尽力而为，失败不影响后续流程 */
@@ -111,7 +115,10 @@ export function unlockAudio(): void {
  * 音质不如火山，但零配置、离线可用 —— 保证故事永远念得出来，
  * 不会因为凭据没配好就退化成让孩子自己点着读字。
  */
-async function speakViaBrowser(text: string): Promise<boolean> {
+async function speakViaBrowser(
+  text: string,
+  onPlaying?: () => void
+): Promise<boolean> {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     return false;
   }
@@ -138,6 +145,7 @@ async function speakViaBrowser(text: string): Promise<boolean> {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "zh-CN";
     u.rate = 0.95;
+    u.onstart = () => onPlaying?.();
     u.onend = () => done(true);
     u.onerror = () => done(false);
     window.speechSynthesis.cancel();
@@ -165,7 +173,11 @@ async function speakViaBrowser(text: string): Promise<boolean> {
  *
  * 代理层限 500 字，剧集分段后每段远低于此；超长时截断而不是整段失败。
  */
-export async function speakSegment(text: string): Promise<boolean> {
+export async function speakSegment(
+  text: string,
+  /** 音频真正开始出声时回调 —— 用来把「取音频中」和「正在念」分开显示 */
+  onPlaying?: () => void
+): Promise<boolean> {
   if (!text.trim()) return false;
   stopSegment();
 
@@ -209,6 +221,7 @@ export async function speakSegment(text: string): Promise<boolean> {
             Math.max(8000, spoken.length * 500)
           );
 
+          audio.onplaying = () => onPlaying?.();
           audio.onended = () => done(true);
           audio.onerror = () => done(false);
           audio.play().catch(() => done(false));
@@ -229,7 +242,7 @@ export async function speakSegment(text: string): Promise<boolean> {
     }
   }
 
-  return speakViaBrowser(spoken);
+  return speakViaBrowser(spoken, onPlaying);
 }
 
 /** 打断当前段（她点了跳过 / 离开页面） */
