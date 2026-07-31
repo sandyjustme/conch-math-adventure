@@ -11,7 +11,12 @@ import {
   segmentsBefore,
   segmentsAfter,
 } from "../../engine/dramaEngine";
-import { speakSegment, stopSegment, unlockAudio } from "../../services/tts";
+import {
+  speakSegment,
+  stopSegment,
+  unlockAudio,
+  ttsDiag,
+} from "../../services/tts";
 import { flushPersistence } from "../../hooks/usePersistence";
 
 type Phase = "cover" | "before" | "choice" | "after" | "end";
@@ -48,12 +53,29 @@ export default function EpisodePlayer() {
     "idle"
   );
   const [unlockedSeason, setUnlockedSeason] = useState<number | null>(null);
+  /** 当前这一拍已经等了几秒 —— 让人一眼看出是还在跑还是真死了 */
+  const [waitedSec, setWaitedSec] = useState(0);
+  /** 加 ?debug=1 打开诊断面板，平时不打扰她 */
+  const debug =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("debug");
   /** 用来作废过期的朗读回调（她跳过或离开时） */
   const runId = useRef(0);
   /** 她这一集选了哪个，结算时写进记录 */
   const lastPicked = useRef<"A" | "B" | null>(null);
 
   useEffect(() => () => stopSegment(), []);
+
+  // 朗读期间每秒累加，idle 时归零
+  useEffect(() => {
+    if (audioState === "idle") {
+      setWaitedSec(0);
+      return;
+    }
+    setWaitedSec(0);
+    const t = setInterval(() => setWaitedSec((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [audioState, beatIdx, phase]);
 
   const beats =
     phase === "before"
@@ -234,6 +256,21 @@ export default function EpisodePlayer() {
         </button>
       </header>
       {children}
+      {debug && (
+        <div className="fixed bottom-0 inset-x-0 bg-black/85 text-[10px] leading-relaxed text-lime-300 px-3 py-2 font-mono z-50">
+          <div>
+            状态 {audioState} · 已等 {waitedSec}s · 第{beatIdx + 1}拍 · {phase}
+          </div>
+          <div>
+            路径 {ttsDiag.path} · 取音频 {ttsDiag.fetchMs}ms ·{" "}
+            {Math.round(ttsDiag.bytes / 1024)}KB · 播放 {ttsDiag.playMs}ms
+          </div>
+          <div>
+            结果 {ttsDiag.result}
+            {ttsDiag.error ? ` · 错误 ${ttsDiag.error}` : ""}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -370,7 +407,8 @@ export default function EpisodePlayer() {
         ) : audioState !== "idle" ? (
           <span className="inline-flex items-center gap-2 text-[11px] text-slate-500">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-            {audioState === "fetching" ? "取音频中…" : "正在念…"}
+            {audioState === "fetching" ? "取音频中" : "正在念"}
+            {waitedSec > 0 ? ` ${waitedSec}s` : "…"}
             <span className="text-slate-700">· 点屏幕可跳过</span>
           </span>
         ) : (

@@ -66,6 +66,16 @@ export function stopSpeech(): void {
 /** 火山连续失败后就不再浪费往返，直接走浏览器语音 */
 let volcanoDown = false;
 
+/** 最近一次朗读的诊断信息，供 ?debug=1 时在页面上显示 */
+export const ttsDiag = {
+  path: "-" as string,
+  fetchMs: 0,
+  bytes: 0,
+  playMs: 0,
+  result: "-" as string,
+  error: "" as string,
+};
+
 /* ── 自动播放解锁 ──────────────────────────────
    浏览器只允许在用户手势的授权窗口内发起播放。剧集是一拍接一拍
    自动往下走的，第二拍之后都发生在异步回调里，手势早就过期了。
@@ -139,7 +149,7 @@ async function speakViaBrowser(
         window.speechSynthesis.cancel();
         done(false);
       },
-      Math.max(4000, text.length * 400)
+      Math.max(4000, text.length * 300)
     );
 
     const u = new SpeechSynthesisUtterance(text);
@@ -185,6 +195,14 @@ export async function speakSegment(
   // 不转的话 TTS 会按运算符读成「减七」，等于把负数概念教反了。
   const spoken = normalizeForSpeech(text).slice(0, 480);
 
+  ttsDiag.path = volcanoDown ? "浏览器(火山已标记不可用)" : "火山";
+  ttsDiag.fetchMs = 0;
+  ttsDiag.bytes = 0;
+  ttsDiag.playMs = 0;
+  ttsDiag.result = "进行中";
+  ttsDiag.error = "";
+  const t0 = performance.now();
+
   if (!volcanoDown) {
     try {
       const response = await fetch("/api/tts", {
@@ -192,10 +210,13 @@ export async function speakSegment(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: spoken }),
         // 网络卡住时别让整个播放器跟着挂起
-        signal: AbortSignal.timeout(20_000),
+        signal: AbortSignal.timeout(8000),
       });
       if (response.ok) {
-        const url = URL.createObjectURL(await response.blob());
+        const blob = await response.blob();
+        ttsDiag.fetchMs = Math.round(performance.now() - t0);
+        ttsDiag.bytes = blob.size;
+        const url = URL.createObjectURL(blob);
         // 复用被手势解锁过的那个元素，不新建 —— 新建的没被解锁，
         // 第二拍起会被自动播放策略拦下
         const audio = getPlayer();
@@ -218,7 +239,7 @@ export async function speakSegment(
               audio.pause();
               done(false);
             },
-            Math.max(8000, spoken.length * 500)
+            Math.max(6000, spoken.length * 400)
           );
 
           audio.onplaying = () => onPlaying?.();
@@ -228,21 +249,33 @@ export async function speakSegment(
         });
 
         URL.revokeObjectURL(url);
-        if (finished) return true;
+        ttsDiag.playMs = Math.round(performance.now() - t0) - ttsDiag.fetchMs;
+        if (finished) {
+          ttsDiag.result = "火山播完";
+          return true;
+        }
+        ttsDiag.error = "播放被拦或超时";
         console.warn("音频被拦截或播放失败，改用浏览器语音");
       } else {
         volcanoDown = true;
+        ttsDiag.error = `HTTP ${response.status}`;
         console.warn(
           `火山 TTS 不可用（HTTP ${response.status}），本次会话改用浏览器语音`
         );
       }
     } catch (e) {
       volcanoDown = true;
+      ttsDiag.fetchMs = Math.round(performance.now() - t0);
+      ttsDiag.error =
+        e instanceof Error ? `${e.name}: ${e.message}` : String(e);
       console.warn("火山 TTS 请求失败，本次会话改用浏览器语音:", e);
     }
   }
 
-  return speakViaBrowser(spoken, onPlaying);
+  const ok = await speakViaBrowser(spoken, onPlaying);
+  ttsDiag.path += " → 浏览器语音";
+  ttsDiag.result = ok ? "浏览器念完" : "两条路都不通";
+  return ok;
 }
 
 /** 打断当前段（她点了跳过 / 离开页面） */
