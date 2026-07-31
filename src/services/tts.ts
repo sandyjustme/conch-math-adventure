@@ -56,19 +56,55 @@ export function stopSpeech(): void {
     audio.pause();
     audio.currentTime = 0;
   });
-  if (currentSegment) {
-    currentSegment.pause();
-    currentSegment = null;
-  }
+  stopSegment();
 }
 
 /* ═══════════════════════════════════════════
    短剧播放：一段读完才 resolve，播放器据此自动推进下一段
    ═══════════════════════════════════════════ */
 
-let currentSegment: HTMLAudioElement | null = null;
 /** 火山连续失败后就不再浪费往返，直接走浏览器语音 */
 let volcanoDown = false;
+
+/* ── 自动播放解锁 ──────────────────────────────
+   浏览器只允许在用户手势的授权窗口内发起播放。剧集是一拍接一拍
+   自动往下走的，第二拍之后都发生在异步回调里，手势早就过期了。
+
+   对策：全程复用**同一个** Audio 元素，并在用户点「继续听」的同步
+   上下文里先 play 一次静音 —— 元素一旦被手势解锁，后续换 src 再
+   play 就不再受限。每拍新建 Audio 是行不通的，新元素没被解锁过。
+   ────────────────────────────────────────── */
+
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=";
+
+let player: HTMLAudioElement | null = null;
+
+function getPlayer(): HTMLAudioElement {
+  if (!player) {
+    player = new Audio();
+    player.preload = "auto";
+  }
+  return player;
+}
+
+/** 必须在用户点击的同步上下文里调用（点「继续听」、点选项时） */
+export function unlockAudio(): void {
+  try {
+    const a = getPlayer();
+    a.src = SILENT_WAV;
+    void a.play().catch(() => {
+      /* 解锁失败就靠 speakViaBrowser 兜底 */
+    });
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      // 同理解锁 Web Speech：在手势里发一条空 utterance
+      const u = new SpeechSynthesisUtterance("");
+      window.speechSynthesis.speak(u);
+    }
+  } catch {
+    /* 解锁是尽力而为，失败不影响后续流程 */
+  }
+}
 
 /**
  * 浏览器内置语音合成兜底。
@@ -82,11 +118,28 @@ async function speakViaBrowser(text: string): Promise<boolean> {
 
   const started = performance.now();
   const ended = await new Promise<boolean>((resolve) => {
+    let settled = false;
+    const done = (v: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(v);
+    };
+    // 被自动播放策略拦下时，onend / onerror 一个都不会触发，
+    // 不设超时这里会永远挂住 —— 界面就停在「正在念…」再也不动。
+    const timer = setTimeout(
+      () => {
+        window.speechSynthesis.cancel();
+        done(false);
+      },
+      Math.max(4000, text.length * 400)
+    );
+
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "zh-CN";
     u.rate = 0.95;
-    u.onend = () => resolve(true);
-    u.onerror = () => resolve(false);
+    u.onend = () => done(true);
+    u.onerror = () => done(false);
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
   });
@@ -126,21 +179,44 @@ export async function speakSegment(text: string): Promise<boolean> {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: spoken }),
+        // 网络卡住时别让整个播放器跟着挂起
+        signal: AbortSignal.timeout(20_000),
       });
       if (response.ok) {
         const url = URL.createObjectURL(await response.blob());
-        const audio = new Audio(url);
-        currentSegment = audio;
+        // 复用被手势解锁过的那个元素，不新建 —— 新建的没被解锁，
+        // 第二拍起会被自动播放策略拦下
+        const audio = getPlayer();
+        audio.src = url;
 
         const finished = await new Promise<boolean>((resolve) => {
-          audio.onended = () => resolve(true);
-          audio.onerror = () => resolve(false);
-          audio.play().catch(() => resolve(false));
+          let settled = false;
+          const done = (v: boolean) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            audio.onended = null;
+            audio.onerror = null;
+            resolve(v);
+          };
+          // 被拦下时 play() 的 rejection 有的浏览器不抛，
+          // 音频事件也不来 —— 必须有兜底超时，否则界面永远停在「正在念…」
+          const timer = setTimeout(
+            () => {
+              audio.pause();
+              done(false);
+            },
+            Math.max(8000, spoken.length * 500)
+          );
+
+          audio.onended = () => done(true);
+          audio.onerror = () => done(false);
+          audio.play().catch(() => done(false));
         });
 
         URL.revokeObjectURL(url);
-        if (currentSegment === audio) currentSegment = null;
         if (finished) return true;
+        console.warn("音频被拦截或播放失败，改用浏览器语音");
       } else {
         volcanoDown = true;
         console.warn(
@@ -158,9 +234,8 @@ export async function speakSegment(text: string): Promise<boolean> {
 
 /** 打断当前段（她点了跳过 / 离开页面） */
 export function stopSegment(): void {
-  if (currentSegment) {
-    currentSegment.pause();
-    currentSegment = null;
+  if (player) {
+    player.pause();
   }
   if (typeof window !== "undefined" && "speechSynthesis" in window) {
     window.speechSynthesis.cancel();

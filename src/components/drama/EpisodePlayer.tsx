@@ -11,7 +11,7 @@ import {
   segmentsBefore,
   segmentsAfter,
 } from "../../engine/dramaEngine";
-import { speakSegment, stopSegment } from "../../services/tts";
+import { speakSegment, stopSegment, unlockAudio } from "../../services/tts";
 import { flushPersistence } from "../../hooks/usePersistence";
 
 type Phase = "cover" | "before" | "choice" | "after" | "end";
@@ -163,7 +163,15 @@ export default function EpisodePlayer() {
     // advanceBeat 每次渲染都会变，这里只在段落变化时重跑
   }, [beatText, phase, ttsEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** 她点屏幕跳过这一拍 —— 是真手势，顺手续期播放授权 */
+  const skipBeat = () => {
+    unlockAudio();
+    advanceBeat();
+  };
+
   const start = () => {
+    // 必须在点击的同步上下文里解锁，否则第 2 拍起会被自动播放策略拦下
+    unlockAudio();
     setBeatIdx(0);
     setBranchText("");
     setWasCorrect(null);
@@ -174,6 +182,7 @@ export default function EpisodePlayer() {
 
   const pick = (picked: "A" | "B") => {
     if (!episode) return;
+    unlockAudio(); // 顺手续期一次手势授权
     const { correct, text } = judgeChoice(episode, picked);
     lastPicked.current = picked;
     setWasCorrect(correct);
@@ -333,11 +342,11 @@ export default function EpisodePlayer() {
   return shell(
     <div
       className="flex-1 flex flex-col justify-center px-6 pb-16 cursor-pointer select-none"
-      onClick={advanceBeat}
+      onClick={skipBeat}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") advanceBeat();
+        if (e.key === "Enter" || e.key === " ") skipBeat();
       }}
       aria-label="点一下继续"
     >
