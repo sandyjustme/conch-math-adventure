@@ -1,6 +1,28 @@
 import { createServer } from "http";
+import type { IncomingMessage, ServerResponse } from "http";
 
 const PORT = process.env.PORT || 3456;
+
+/** 把 Node req/res 适配成标准 Request/Response，交给 server/api 下的唯一实现 */
+async function dispatch(
+  req: IncomingMessage,
+  res: ServerResponse,
+  pathname: string
+) {
+  const mod =
+    pathname === "/api/tts"
+      ? await import("./api/tts")
+      : await import("./api/chat");
+  const body = await readBody(req);
+  const request = new Request(`http://localhost:${PORT}${pathname}`, {
+    method: "POST",
+    body,
+  });
+  const response = await mod.handler(request);
+  res.writeHead(response.status, Object.fromEntries(response.headers));
+  const buf = await response.arrayBuffer();
+  res.end(Buffer.from(buf));
+}
 
 const server = createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -15,31 +37,11 @@ const server = createServer(async (req, res) => {
 
   const url = new URL(req.url || "/", `http://localhost:${PORT}`);
 
-  if (url.pathname === "/api/chat" && req.method === "POST") {
-    const { handler } = await import("./api/chat");
-    const body = await readBody(req);
-    const request = new Request(`http://localhost:${PORT}/api/chat`, {
-      method: "POST",
-      body,
-    });
-    const response = await handler(request);
-    res.writeHead(response.status, Object.fromEntries(response.headers));
-    const buf = await response.arrayBuffer();
-    res.end(Buffer.from(buf));
-    return;
-  }
-
-  if (url.pathname === "/api/tts" && req.method === "POST") {
-    const { handler } = await import("./api/tts");
-    const body = await readBody(req);
-    const request = new Request(`http://localhost:${PORT}/api/tts`, {
-      method: "POST",
-      body,
-    });
-    const response = await handler(request);
-    res.writeHead(response.status, Object.fromEntries(response.headers));
-    const buf = await response.arrayBuffer();
-    res.end(Buffer.from(buf));
+  if (
+    req.method === "POST" &&
+    (url.pathname === "/api/tts" || url.pathname.startsWith("/api/deepseek/"))
+  ) {
+    await dispatch(req, res, url.pathname);
     return;
   }
 
@@ -47,9 +49,7 @@ const server = createServer(async (req, res) => {
   res.end("Not found");
 });
 
-function readBody(
-  req: ReturnType<typeof createServer> extends { on: infer T } ? any : any
-): Promise<string> {
+function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve) => {
     let body = "";
     req.on("data", (chunk: string) => (body += chunk));

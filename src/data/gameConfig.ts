@@ -17,3 +17,7 @@ export const MASTERY_THRESHOLD = 0.9;
 export const CORRECT_STREAK_TO_ADVANCE = 4;
 export const CORRECT_STREAK_TO_REDUCE_SCAFFOLD = 2;
 export const MAX_CONSECUTIVE_FAILURES = 2;
+
+// 同一知识点聊满 N 轮仍未收到 AI 的 PRACTICE 放行标记时，
+// 前端温和提示可转去潜水算术（非强制，选择权给孩子）
+export const PRACTICE_FALLBACK_TURNS = 8;

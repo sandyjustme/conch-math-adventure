@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { EXCHANGE_RATE } from "../data/gameConfig";
+import type { Episode } from "../data/dramaWorld";
 import type {
   View,
   RareShell,
@@ -7,10 +8,24 @@ import type {
   AnswerRecord,
   GameScore,
   Redemption,
+  EpisodeRecord,
 } from "../types";
 
 interface AppState {
   currentView: View;
+
+  // ── v3 短剧 ──
+  /** 下一集要播的集号，从 1 开始 */
+  currentEp: number;
+  episodeProgress: EpisodeRecord[];
+  /** 已解锁点单权的季号 */
+  seasonUnlocks: number[];
+  /** AI 生成并通过校验的剧集缓存 */
+  generatedEpisodes: Episode[];
+  completeEpisode: (record: EpisodeRecord) => void;
+  advanceEpisode: () => void;
+  unlockSeason: (season: number) => void;
+  addGeneratedEpisode: (ep: Episode) => void;
 
   fragments: number;
   pearls: number;
@@ -112,7 +127,33 @@ interface AppState {
 let _toastId = 0;
 
 const useStore = create<AppState>((set) => ({
-  currentView: "cafe",
+  currentView: "drama",
+
+  // ── v3 短剧 ──
+  currentEp: 1,
+  episodeProgress: [],
+  seasonUnlocks: [],
+  generatedEpisodes: [],
+
+  completeEpisode: (record) =>
+    set((s) => ({
+      episodeProgress: s.episodeProgress.some((r) => r.no === record.no)
+        ? s.episodeProgress.map((r) => (r.no === record.no ? record : r))
+        : [...s.episodeProgress, record],
+    })),
+  advanceEpisode: () => set((s) => ({ currentEp: s.currentEp + 1 })),
+  unlockSeason: (season) =>
+    set((s) => ({
+      seasonUnlocks: s.seasonUnlocks.includes(season)
+        ? s.seasonUnlocks
+        : [...s.seasonUnlocks, season],
+    })),
+  addGeneratedEpisode: (ep) =>
+    set((s) => ({
+      generatedEpisodes: s.generatedEpisodes.some((e) => e.no === ep.no)
+        ? s.generatedEpisodes
+        : [...s.generatedEpisodes, ep],
+    })),
 
   fragments: 0,
   pearls: 0,

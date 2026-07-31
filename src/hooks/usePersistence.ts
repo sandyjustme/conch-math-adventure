@@ -1,5 +1,12 @@
-import { useEffect, useCallback, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import useStore from "../store/useStore";
+import {
+  FIELDS,
+  STATE_VERSION,
+  VERSION_KEY,
+  buildPatch,
+  migrate,
+} from "../store/persistenceSchema";
 
 const DB_NAME = "conch-math";
 const DB_VERSION = 1;
@@ -45,7 +52,32 @@ async function setItem(key: string, value: any): Promise<void> {
   });
 }
 
+/**
+ * 立即落盘，不等 500ms 防抖。
+ *
+ * 用在「结束这一集」这种她很可能马上关掉 app 的时刻 ——
+ * 否则防抖窗口内退出会丢掉刚听完的那一集（进度回退一集 + 珍珠不发）。
+ * zustand 的 set 是同步的，所以调用方改完 store 直接调这个即可。
+ */
+export function flushPersistence(): void {
+  void saveSnapshot();
+}
+
+/** 把 store 当前快照按注册表写入 IndexedDB（模块级，只依赖 getState） */
+async function saveSnapshot(): Promise<void> {
+  try {
+    const s = useStore.getState();
+    for (const f of FIELDS) {
+      await setItem(f.key, f.read(s));
+    }
+    await setItem(VERSION_KEY, STATE_VERSION);
+  } catch (e) {
+    console.error("Failed to save state:", e);
+  }
+}
+
 export function usePersistence() {
+  // 以下订阅只用于触发保存，保存时实际读取 getState() 快照，不存在闭包过期问题
   const fragments = useStore((s) => s.fragments);
   const pearls = useStore((s) => s.pearls);
   const rareShells = useStore((s) => s.rareShells);
@@ -57,95 +89,66 @@ export function usePersistence() {
   const playTokens = useStore((s) => s.playTokens);
   const solvedSoups = useStore((s) => s.solvedSoups);
   const revealedSoups = useStore((s) => s.revealedSoups);
+  const lastLoginDate = useStore((s) => s.lastLoginDate);
+  const consecutiveDays = useStore((s) => s.consecutiveDays);
+  const currentEp = useStore((s) => s.currentEp);
+  const episodeProgress = useStore((s) => s.episodeProgress);
+  const seasonUnlocks = useStore((s) => s.seasonUnlocks);
+  const generatedEpisodes = useStore((s) => s.generatedEpisodes);
   const loadedRef = useRef(false);
   const [loaded, setLoaded] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      const shells = await getItem("shells");
-      if (shells != null) {
-        useStore.setState({
-          fragments: shells.fragments ?? 0,
-          pearls: shells.pearls ?? 0,
-        });
-      }
-      const mastered = await getItem("masteredNodes");
-      if (mastered) useStore.setState({ masteredNodes: mastered });
-      const attacks = await getItem("sneakAttacks");
-      if (attacks) useStore.setState({ sneakAttacks: attacks });
-      const records = await getItem("answerRecords");
-      if (records) useStore.setState({ answerRecords: records });
-      const reds = await getItem("redemptions");
-      if (reds) useStore.setState({ redemptions: reds });
-      const shells2 = await getItem("rareShells");
-      if (shells2) useStore.setState({ rareShells: shells2 });
-      const diag = await getItem("diagnosticsCompleted");
-      if (diag === true) useStore.setState({ diagnosticsCompleted: true });
-      const loginDate = await getItem("lastLoginDate");
-      if (typeof loginDate === "string")
-        useStore.setState({ lastLoginDate: loginDate });
-      const consDays = await getItem("consecutiveDays");
-      if (typeof consDays === "number")
-        useStore.setState({ consecutiveDays: consDays });
-      const tokens = await getItem("playTokens");
-      if (typeof tokens === "number") useStore.setState({ playTokens: tokens });
-      const ss = await getItem("solvedSoups");
-      if (Array.isArray(ss)) useStore.setState({ solvedSoups: ss });
-      const rs = await getItem("revealedSoups");
-      if (Array.isArray(rs)) useStore.setState({ revealedSoups: rs });
-    } catch (e) {
-      console.error("Failed to load state:", e);
-    } finally {
-      loadedRef.current = true;
-      setLoaded(true);
-    }
-  }, []);
-
-  const lastLoginDate = useStore((s) => s.lastLoginDate);
-  const consecutiveDays = useStore((s) => s.consecutiveDays);
-
-  const save = useCallback(async () => {
-    try {
-      await setItem("shells", { fragments, pearls });
-      await setItem("masteredNodes", masteredNodes);
-      await setItem("sneakAttacks", sneakAttacks);
-      await setItem("answerRecords", answerRecords);
-      await setItem("redemptions", redemptions);
-      await setItem("rareShells", rareShells);
-      await setItem("diagnosticsCompleted", diagnosticsCompleted);
-      await setItem("lastLoginDate", lastLoginDate);
-      await setItem("consecutiveDays", consecutiveDays);
-      await setItem("playTokens", playTokens);
-      await setItem("solvedSoups", solvedSoups);
-      await setItem("revealedSoups", revealedSoups);
-    } catch (e) {
-      console.error("Failed to save state:", e);
-    }
-  }, [
-    fragments,
-    pearls,
-    masteredNodes,
-    sneakAttacks,
-    answerRecords,
-    redemptions,
-    rareShells,
-    diagnosticsCompleted,
-    lastLoginDate,
-    consecutiveDays,
-    playTokens,
-    solvedSoups,
-    revealedSoups,
-  ]);
-
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const version = ((await getItem(VERSION_KEY)) as number) ?? 1;
+        const raw: Record<string, unknown> = {};
+        for (const f of FIELDS) {
+          raw[f.key] = await getItem(f.key);
+        }
+        const patch = buildPatch(migrate(version, raw));
+        if (!cancelled && Object.keys(patch).length > 0) {
+          useStore.setState(patch);
+        }
+      } catch (e) {
+        console.error("Failed to load state:", e);
+      } finally {
+        if (!cancelled) {
+          loadedRef.current = true;
+          setLoaded(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!loadedRef.current) return;
-    const timer = setTimeout(save, 500);
+    const timer = setTimeout(saveSnapshot, 500);
     return () => clearTimeout(timer);
-  }, [fragments, pearls, masteredNodes.length, save]);
+  }, [
+    loaded,
+    fragments,
+    pearls,
+    rareShells,
+    masteredNodes,
+    answerRecords,
+    sneakAttacks,
+    redemptions,
+    diagnosticsCompleted,
+    playTokens,
+    solvedSoups,
+    revealedSoups,
+    lastLoginDate,
+    consecutiveDays,
+    currentEp,
+    episodeProgress,
+    seasonUnlocks,
+    generatedEpisodes,
+  ]);
 
   return loaded;
 }

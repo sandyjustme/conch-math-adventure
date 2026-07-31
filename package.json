@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:server": "tsx server/dev.ts",
+    "dev:server": "tsx --env-file-if-exists=.env server/dev.ts",
     "build": "tsc && vite build",
+    "build:server": "tsc -p tsconfig.server.json",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "start": "node serve.cjs",
+    "prestart": "npm run build:server",
+    "start": "node --env-file-if-exists=.env serve.cjs",
     "preview": "vite preview",
     "prepare": "husky"
   },

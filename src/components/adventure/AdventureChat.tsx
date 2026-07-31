@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import useStore from "../../store/useStore";
-import { NODES, NODE_MAP } from "../../data/knowledgeGraph";
+import { NODES, NODE_MAP, PRACTICE_NODES } from "../../data/knowledgeGraph";
+import { PRACTICE_FALLBACK_TURNS } from "../../data/gameConfig";
 import {
   sendChatMessage,
   parseLevelTag,
@@ -24,25 +25,6 @@ const WELCOME_MESSAGE = {
   text: "嗨！我是海小喵～准备好了就点下面的「开始闯关」，我们一起去海底探险，找到你卡住的地方！",
 };
 
-const PRACTICE_NODES = [
-  "K1",
-  "K3",
-  "K5",
-  "K6",
-  "K7",
-  "K8",
-  "K9",
-  "K10",
-  "K11",
-  "K12",
-  "K13",
-  "K14",
-  "K16",
-  "K17",
-  "K19",
-  "K20",
-];
-
 export default function AdventureChat() {
   const setView = useStore((s) => s.setView);
   const messages = useStore((s) => s.messages);
@@ -65,14 +47,19 @@ export default function AdventureChat() {
   const [showLine, setShowLine] = useState(false);
   const [listening, setListening] = useState(false);
   // 想通进度：绑定到某个知识点；steps 随小突破增长，ready 由 AI 判定学懂后置 true
+  // turns 记录该节点已聊轮数，用于 PRACTICE 兜底提示；dismissed 记录孩子已拒绝过转场
   const [understand, setUnderstand] = useState<{
     node: string;
     steps: number;
     ready: boolean;
+    turns: number;
+    dismissed: boolean;
   }>({
     node: currentNodeId,
     steps: 0,
     ready: false,
+    turns: 0,
+    dismissed: false,
   });
   const scrollRef = useRef<HTMLDivElement>(null);
   const fragPending = useRef(0); // 累加 0.5 碎片，满 1 才入账
@@ -160,8 +147,14 @@ export default function AdventureChat() {
         setUnderstand((prev) => {
           const u =
             prev.node === replyNode
-              ? { ...prev }
-              : { node: replyNode, steps: 0, ready: false };
+              ? { ...prev, turns: prev.turns + 1 }
+              : {
+                  node: replyNode,
+                  steps: 0,
+                  ready: false,
+                  turns: 1,
+                  dismissed: false,
+                };
           if (rewardGained > 0) u.steps = Math.min(4, u.steps + 1);
           if (ready && !u.ready) {
             u.ready = true;
@@ -241,6 +234,13 @@ export default function AdventureChat() {
   const isStart = messages.length <= 1;
   const supported = PRACTICE_NODES.includes(currentNodeId);
   const readyHere = understand.ready;
+  // PRACTICE 兜底：同节点聊满 N 轮 AI 仍未放行 → 温和提示可转潜水（非强制）
+  const showPracticeFallback =
+    supported &&
+    !readyHere &&
+    !understand.dismissed &&
+    understand.node === currentNodeId &&
+    understand.turns >= PRACTICE_FALLBACK_TURNS;
   const steps = understand.node === currentNodeId ? understand.steps : 0;
   const barWidth = readyHere ? 100 : Math.min(85, 12 + steps * 24);
   // 当前节点对话轮数（只算用户发言）
@@ -370,6 +370,37 @@ export default function AdventureChat() {
             >
               🐚 学得不错！去潜水练一练「{currentNode?.name}」→
             </button>
+          </div>
+        )}
+
+        {/* PRACTICE 兜底：聊了很久还没放行时，给个换方式练的出口（可拒绝） */}
+        {showPracticeFallback && (
+          <div className="flex justify-center pt-1 pb-2">
+            <div className="bg-teal-50 border border-teal-200 rounded-2xl p-3 max-w-sm text-center shadow-sm">
+              <p className="text-xs text-teal-700 leading-relaxed mb-2">
+                🐢
+                这个知识点聊了好久啦～想不想换个方式？去潜水算术里边玩边练，随时能回来接着聊！
+              </p>
+              <div className="flex gap-2 justify-center">
+                <button
+                  onClick={() => {
+                    setDiveFocus(currentNodeId);
+                    setView("dive");
+                  }}
+                  className="px-4 py-2 rounded-full bg-teal-500 text-white text-xs font-bold hover:bg-teal-600 transition active:scale-95"
+                >
+                  去练一练 →
+                </button>
+                <button
+                  onClick={() =>
+                    setUnderstand((prev) => ({ ...prev, dismissed: true }))
+                  }
+                  className="px-4 py-2 rounded-full bg-white text-teal-600 text-xs font-bold border border-teal-200 hover:bg-teal-50 transition active:scale-95"
+                >
+                  继续聊
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

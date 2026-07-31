@@ -49,7 +49,16 @@ export interface Redemption {
   time: string;
 }
 
+/** 一集的完成记录（持久化）。无题集的 choice / correct 为 null */
+export interface EpisodeRecord {
+  no: number;
+  choice: "A" | "B" | null;
+  correct: boolean | null;
+  completedAt: number;
+}
+
 export type View =
+  | "drama"
   | "cafe"
   | "adventure"
   | "dive"

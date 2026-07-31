@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import useStore from "../../store/useStore";
-import { getGlobalMultiplier } from "../../engine/rewardEngine";
 import {
-  ALL_TASKS,
+  judgeStep,
+  computeLevelReward,
+  getDiveTasks,
+} from "../../engine/diveMathEngine";
+import {
   DIVE_MAX,
   DIVE_MIN,
   NODE_NAME,
@@ -70,11 +73,7 @@ export default function DiveMath() {
   const diveFromAdventure = useStore((s) => s.diveFromAdventure);
   const todayAdventureCount = useStore((s) => s.todayAdventureCount);
 
-  const tasks = useMemo(
-    () =>
-      diveFocus ? ALL_TASKS.filter((t) => t.node === diveFocus) : ALL_TASKS,
-    [diveFocus]
-  );
+  const tasks = useMemo(() => getDiveTasks(diveFocus), [diveFocus]);
   const focusLabel = diveFocus ? NODE_NAME[diveFocus as NodeId] : "全程";
 
   const [levelIdx, setLevelIdx] = useState(0);
@@ -138,7 +137,8 @@ export default function DiveMath() {
   };
 
   const evaluate = (v: number) => {
-    if (v === step.to) {
+    const verdict = judgeStep(step, v);
+    if (verdict.correct) {
       beep(880, sfxEnabled);
       setTrail((t) => [
         ...t,
@@ -147,16 +147,17 @@ export default function DiveMath() {
       setHint(null);
       if (stepIdx === steps.length - 1) {
         setPhase("done");
-        // 答错倒扣 + 倍率计算
-        const base = Math.max(0, 1 - wrongCount * 0.2);
-        const fromAdventure = diveFromAdventure ? 1.5 : 1.0;
-        const globalMult = getGlobalMultiplier(todayAdventureCount);
-        const final = Math.floor(base * fromAdventure * globalMult);
-        if (final > 0) {
-          addFragments(final);
-          addPearls(1);
-          addPlayTokens(2);
-          showToast("fragment", final);
+        // 过关结算（答错倒扣 + 倍率，规则见 engine/diveMathEngine）
+        const reward = computeLevelReward(
+          wrongCount,
+          diveFromAdventure,
+          todayAdventureCount
+        );
+        if (reward.fragments > 0) {
+          addFragments(reward.fragments);
+          addPearls(reward.pearls);
+          addPlayTokens(reward.playTokens);
+          showToast("fragment", reward.fragments);
         }
         addAnswerRecord({
           nodeId: task.node,
@@ -171,7 +172,7 @@ export default function DiveMath() {
     } else {
       beep(220, sfxEnabled);
       // 只显示方向，不暴露精确终点
-      setHint({ dir: step.to > step.from ? "up" : "down" });
+      setHint({ dir: verdict.hintDir! });
       setWrongCount((c) => c + 1);
       setCurrent(step.from);
     }

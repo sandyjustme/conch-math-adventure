@@ -3,6 +3,7 @@ import useStore from "../store/useStore";
 import type { View } from "../types";
 
 const VIEWS: ReadonlySet<string> = new Set<View>([
+  "drama",
   "cafe",
   "adventure",
   "dive",

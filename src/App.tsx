@@ -6,7 +6,9 @@ import { useHashRouting } from "./hooks/useHashRouting";
 import { usePageTitle } from "./hooks/usePageTitle";
 import { runValidation } from "./engine/validateGraph";
 import { runDiveTasksValidation } from "./engine/validateDiveTasks";
+import { runDramaValidation } from "./engine/validateDrama";
 import FeedbackOverlay from "./components/shared/FeedbackOverlay";
+import EpisodePlayer from "./components/drama/EpisodePlayer";
 import CafeHall from "./components/cafe/CafeHall";
 import AdventureChat from "./components/adventure/AdventureChat";
 import DiveMath from "./components/adventure/DiveMath";
@@ -24,6 +26,7 @@ export default function App() {
   useEffect(() => {
     runValidation();
     runDiveTasksValidation();
+    runDramaValidation();
   }, []);
   const loaded = usePersistence();
   useLoginCheck(loaded);
@@ -51,6 +54,10 @@ export default function App() {
 
   const view = (() => {
     switch (currentView) {
+      // v2 的六个玩法保留在仓库里，但已从主路径移除（只能靠 #/xxx 手输进入）。
+      // 默认视图是短剧播放器 —— 没有大厅、没有玩法选择，取消选择即取消套利。
+      case "cafe":
+        return <CafeHall />;
       case "adventure":
         return <AdventureChat />;
       case "dive":
@@ -72,14 +79,17 @@ export default function App() {
       case "dashboard":
         return <Dashboard />;
       default:
-        return <CafeHall />;
+        return <EpisodePlayer />;
     }
   })();
 
   return (
     <>
       <main id="main-content">{view}</main>
-      {showTest && <PrePostTest onDone={() => setShowTest(false)} />}
+      {/* 前后测只在 v2 路径下弹；短剧路径第一眼必须是故事，不能是测验 */}
+      {showTest && currentView !== "drama" && (
+        <PrePostTest onDone={() => setShowTest(false)} />
+      )}
       {toasts.map((t) => (
         <FeedbackOverlay
           key={t.id}

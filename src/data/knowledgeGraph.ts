@@ -367,3 +367,26 @@ export const CHAPTER_ORDER = [
 ];
 
 export const DIAGNOSIS_ENTRY = "K19";
+
+/**
+ * 支持「聊通后转潜水练习」的知识点（AdventureChat 的 PRACTICE 放行使能）。
+ * 加新章节时：新章节的节点 id 加进这里，该章节的探险闭环即生效。
+ */
+export const PRACTICE_NODES = [
+  "K1",
+  "K3",
+  "K5",
+  "K6",
+  "K7",
+  "K8",
+  "K9",
+  "K10",
+  "K11",
+  "K12",
+  "K13",
+  "K14",
+  "K16",
+  "K17",
+  "K19",
+  "K20",
+];

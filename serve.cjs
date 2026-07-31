@@ -1,12 +1,13 @@
+// 喵喵趣学生产服务器（阿里云 PM2）
+// 静态文件 + 限流在本文件；AI/TTS 代理逻辑唯一实现见 server/api/*.ts，
+// 由 `npm run build:server` 编译到 server/dist 后在此动态 import。
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
 const PORT = process.env.PORT || 3000;
-const API_KEY = process.env.DEEPSEEK_API_KEY || "";
-const TTS_APP_ID = process.env.VOLCANO_TTS_APP_ID || "";
-const TTS_TOKEN = process.env.VOLCANO_TTS_TOKEN || "";
 const DIST = path.join(__dirname, "dist");
+const API_DIST = path.join(__dirname, "server", "dist", "api");
 
 // 轻量内存限流：每 IP 每分钟最多 30 次 /api 请求
 const RATE_LIMIT = 30;
@@ -58,85 +59,42 @@ function serveFile(filePath, res) {
   }
 }
 
-function proxyDeepseek(req, res) {
-  if (!API_KEY) {
-    res.writeHead(500).end(JSON.stringify({ error: "API key not configured" }));
-    return;
-  }
-  const apiPath = req.url.replace("/api/deepseek/", "");
-  const body = [];
-  req.on("data", (chunk) => body.push(chunk));
-  req.on("end", async () => {
-    try {
-      const raw = Buffer.concat(body).toString();
-      const response = await fetch(`https://api.deepseek.com/${apiPath}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${API_KEY}`,
-        },
-        body: raw,
-        signal: AbortSignal.timeout(30_000),
-      });
-      const data = await response.text();
-      res.setHeader("Content-Type", "application/json");
-      res.end(data);
-    } catch (e) {
-      res.writeHead(500).end(JSON.stringify({ error: "Proxy error" }));
-    }
+function readBody(req) {
+  return new Promise((resolve) => {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => resolve(body));
   });
 }
 
-function proxyTts(req, res) {
-  if (!TTS_APP_ID || !TTS_TOKEN) {
-    res.writeHead(500).end(JSON.stringify({ error: "TTS not configured" }));
-    return;
-  }
-  const body = [];
-  req.on("data", (chunk) => body.push(chunk));
-  req.on("end", async () => {
-    try {
-      const { text } = JSON.parse(Buffer.concat(body).toString());
-      if (typeof text !== "string" || !text || text.length > 500) {
-        res.writeHead(400).end(JSON.stringify({ error: "Invalid text" }));
-        return;
-      }
-      const response = await fetch(
-        "https://openspeech.bytedance.com/api/v1/tts",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: AbortSignal.timeout(15_000),
-          body: JSON.stringify({
-            app: {
-              appid: TTS_APP_ID,
-              token: TTS_TOKEN,
-              cluster: "volcano_tts",
-            },
-            user: { uid: "conch-student" },
-            audio: {
-              voice_type: "zh_female_tianmei",
-              encoding: "mp3",
-              speed_ratio: 0.9,
-            },
-            request: { text, text_type: "plain" },
-          }),
-        }
-      );
-      const audioBuffer = Buffer.from(await response.arrayBuffer());
-      res.writeHead(response.status, {
-        "Content-Type": "audio/mpeg",
-        "Cache-Control": "public, max-age=86400",
-      });
-      res.end(audioBuffer);
-    } catch (e) {
-      res.writeHead(500).end(JSON.stringify({ error: "TTS proxy error" }));
+/** 适配 Node req/res → 标准 Request/Response，复用 server/api 唯一实现 */
+async function dispatchApi(req, res, pathname) {
+  try {
+    const mod =
+      pathname === "/api/tts"
+        ? await import(path.join(API_DIST, "tts.js"))
+        : await import(path.join(API_DIST, "chat.js"));
+    const body = await readBody(req);
+    const request = new Request(`http://localhost:${PORT}${pathname}`, {
+      method: "POST",
+      body,
+    });
+    const response = await mod.handler(request);
+    res.writeHead(response.status, Object.fromEntries(response.headers));
+    res.end(Buffer.from(await response.arrayBuffer()));
+  } catch (e) {
+    console.error("API dispatch error:", e);
+    if (!res.headersSent) {
+      res.writeHead(500, { "Content-Type": "application/json" });
     }
-  });
+    res.end(JSON.stringify({ error: "Internal server error" }));
+  }
 }
 
 const server = http.createServer((req, res) => {
-  if (req.url.startsWith("/api/")) {
+  const pathname = req.url.split("?")[0];
+
+  if (pathname.startsWith("/api/")) {
     if (req.method !== "POST") {
       res.writeHead(405).end("Method not allowed");
       return;
@@ -146,17 +104,21 @@ const server = http.createServer((req, res) => {
       res.writeHead(429).end(JSON.stringify({ error: "Too many requests" }));
       return;
     }
-    if (req.url.startsWith("/api/deepseek/")) return proxyDeepseek(req, res);
-    if (req.url === "/api/tts") return proxyTts(req, res);
+    if (pathname === "/api/tts" || pathname.startsWith("/api/deepseek/")) {
+      return dispatchApi(req, res, pathname);
+    }
     res.writeHead(404).end(JSON.stringify({ error: "Not found" }));
     return;
   }
 
-  let filePath = path.join(
-    DIST,
-    req.url === "/" ? "index.html" : req.url.split("?")[0]
+  const resolved = path.normalize(
+    path.join(DIST, pathname === "/" ? "index.html" : pathname)
   );
-  serveFile(filePath, res);
+  if (!resolved.startsWith(DIST)) {
+    res.writeHead(403).end("Forbidden");
+    return;
+  }
+  serveFile(resolved, res);
 });
 
 server.listen(PORT, () => {

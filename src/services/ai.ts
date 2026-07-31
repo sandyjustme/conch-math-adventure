@@ -1,3 +1,7 @@
+import { WORLD_SETTING, type Episode } from "../data/dramaWorld";
+import { validateEpisode } from "../engine/validateDrama";
+import { NODE_MAP } from "../data/knowledgeGraph";
+
 export const SYSTEM_PROMPT = `你是"海小喵"🐚，陪一个初一学生玩一个叫"海底探险"的数学小游戏。这个孩子数学基础非常非常薄弱，几乎所有有理数相关内容都不熟，非常容易因为看不懂而放弃，所以你必须极其耐心、极其简单地推进。
 
 【背景设定，讲给学生听时要用】
@@ -157,5 +161,154 @@ export async function reskinSoup(
   } catch (e) {
     console.error("reskinSoup failed:", e);
     return { ...template, name: "今日特调" };
+  }
+}
+
+/* ═══════════════════════════════════════════
+   短剧生成：按知识点续写下一集
+   沿用 reskinSoup 的模式 —— 硬约束 + JSON 自检 + 程序化二次校验
+   ═══════════════════════════════════════════ */
+
+const EPISODE_SYSTEM = `你是一个短剧编剧。你要为一部叫《地下十三层》的连载短剧写下一集。读者是一个初一女生，她只看短剧，不玩游戏，对数学有强烈抵触。
+
+%WORLD%
+
+【本集必须做到的五条硬约束——违反任意一条即作废】
+1. 剧情里必须有一个「主角必须做的决定」，这个决定的正确与否取决于一个数学判断。但**绝不能写成一道题**：不许出现"请问""计算""答案是""等于多少""下列""正确的是"。
+2. 全文**不许出现任何数学术语**：负数、正数、绝对值、相反数、比大小、数轴、有理数、加法、减法、乘法、除法、运算。楼层数、编号、欠分这些故事内的说法可以用。
+3. 两个选项必须是**主角要做的动作或要说的话**，不能是裸数字。
+   ✅「敲四楼那扇门」「说：是 −7 那一层。」
+   ❌「−3」「4」
+4. **答错绝不能阻断剧情**。branchWrong 必须继续把故事往下推，并且在其中**借角色之口把正确的道理说破**（用故事的语言，不是讲解）。
+5. 本集只围绕一个知识点：%NODE_NAME%（%NODE_DESC%）。
+
+【衔接】
+上一集的结尾钩子是：%PREV_HOOK%
+本集开头必须接住它，但**只回应一半**，留着劲。
+上一集她%PREV_RESULT%。
+
+【节奏】
+- 正文总字数 320–430
+- 每一段都要短，句子短，画面感强
+- 结尾必须留新钩子，钩子**不能以句号结尾**
+
+【输出格式——严格 JSON，不要 markdown 代码块，只要纯 JSON】
+{
+  "title": "本集标题（2-5 个字）",
+  "openText": "接住上集钩子，只回应一半",
+  "bodyText": "推进剧情，走到主角必须做决定的那一刻",
+  "choice": {
+    "prompt": "主角要做决定的那句话，比如「她抬起头，说——」",
+    "optionA": "剧情动作，不是裸数字",
+    "optionB": "剧情动作，不是裸数字",
+    "correct": "A 或 B"
+  },
+  "branchRight": "选对了的剧情",
+  "branchWrong": "选错了的剧情，必须继续，并借角色之口说破道理",
+  "hookText": "集末钩子，不以句号结尾",
+  "selfcheck": {"no_math_terms": true, "choices_are_actions": true, "not_a_quiz": true, "wrong_branch_continues": true, "hook_open": true, "one_node_only": true}
+}
+
+任意一项自检不过，输出 {"fail": true, "reason": "哪条没过"} 而不是新的一集。`;
+
+export interface GenerateEpisodeInput {
+  no: number;
+  season: number;
+  nodeId: string;
+  prevHook: string;
+  /** 上一集她答对还是答错，用于决定本集从哪条分支接 */
+  prevCorrect: boolean | null;
+}
+
+/**
+ * 生成一集并做程序化二次校验（不信 AI 自检）。
+ * 校验不过或网络失败一律返回 null —— 调用方回落预写集，
+ * 绝不能让她打开 app 看到"生成失败"。
+ */
+export async function generateEpisode(
+  input: GenerateEpisodeInput
+): Promise<Episode | null> {
+  const node = NODE_MAP.get(input.nodeId);
+  const prompt = EPISODE_SYSTEM.replace("%WORLD%", WORLD_SETTING)
+    .replace("%NODE_NAME%", node?.name ?? input.nodeId)
+    .replace("%NODE_DESC%", node?.description ?? "")
+    .replace("%PREV_HOOK%", input.prevHook || "（这是第一集，没有上集）")
+    .replace(
+      "%PREV_RESULT%",
+      input.prevCorrect === null
+        ? "没有做过选择"
+        : input.prevCorrect
+          ? "选对了"
+          : "选错了，走的是更糟的那条分支"
+    );
+
+  try {
+    const response = await fetch("/api/deepseek/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "deepseek-v4-flash",
+        max_tokens: 1200,
+        temperature: 0.9,
+        messages: [
+          { role: "system", content: prompt },
+          { role: "user", content: `请写第 ${input.no} 集，输出 JSON。` },
+        ],
+      }),
+    });
+
+    const data = await response.json();
+    const raw = data.choices?.[0]?.message?.content || "";
+    const json = raw
+      .replace(/```json\n?/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+    const parsed = JSON.parse(json);
+    if (parsed.fail) {
+      console.warn("generateEpisode 自检未过:", parsed.reason);
+      return null;
+    }
+
+    const episode: Episode = {
+      no: input.no,
+      season: input.season,
+      title: String(parsed.title ?? "").slice(0, 12),
+      nodeId: input.nodeId,
+      openText: String(parsed.openText ?? ""),
+      bodyText: String(parsed.bodyText ?? ""),
+      choice: parsed.choice
+        ? {
+            prompt: String(parsed.choice.prompt ?? ""),
+            optionA: String(parsed.choice.optionA ?? ""),
+            optionB: String(parsed.choice.optionB ?? ""),
+            correct: parsed.choice.correct === "B" ? "B" : "A",
+          }
+        : null,
+      branchRight: String(parsed.branchRight ?? ""),
+      branchWrong: String(parsed.branchWrong ?? ""),
+      hookText: String(parsed.hookText ?? ""),
+    };
+
+    // 程序化二次校验：五条铁律 + 字数
+    const errors = validateEpisode(episode);
+    const wordCount =
+      episode.openText.length +
+      episode.bodyText.length +
+      episode.branchRight.length +
+      episode.hookText.length;
+    if (wordCount < 240 || wordCount > 700) {
+      errors.push(`字数 ${wordCount} 不在 240–700 区间`);
+    }
+
+    if (errors.length > 0) {
+      console.warn("generateEpisode 二次校验未过:", errors);
+      return null;
+    }
+
+    return episode;
+  } catch (e) {
+    console.error("generateEpisode failed:", e);
+    return null;
   }
 }

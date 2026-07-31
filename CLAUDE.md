@@ -40,11 +40,12 @@
 
 ```
 src/
-├── App.tsx                         # 视图路由
+├── App.tsx                         # 视图路由（默认视图 = drama）
 ├── components/
-│   ├── cafe/CafeHall.tsx           # 咖啡馆大厅（主页）
+│   ├── drama/EpisodePlayer.tsx     # 【v3 主界面】短剧播放器，唯一入口
+│   ├── cafe/                     # 〔v2 已冻结〕CafeHall 大厅 + CafeDecor/RulesBoard/GuideModal/SneakAttackBanner
 │   ├── adventure/
-│   │   ├── AdventureChat.tsx       # AI 探险对话（四层引擎集成）
+│   │   ├── AdventureChat.tsx       # AI 探险对话（四层引擎集成 + PRACTICE 兜底）
 │   │   └── OceanLine.tsx           # 海洋数轴可视化
 │   ├── games/
 │   │   ├── GameCorner.tsx          # 游戏角入口
@@ -55,10 +56,14 @@ src/
 │   ├── redeem/RedeemBar.tsx        # 兑换吧台
 │   └── shared/                     # 贝壳计数器 + 声音开关
 ├── engine/
-│   ├── diagnostic.ts               # 诊断引擎
+│   ├── dramaEngine.ts              # 【v3】取集/判定/季进度/解锁/防重听发奖（纯函数）
+│   ├── validateDrama.ts            # 【v3】剧集五条设计铁律校验（构建期 + AI 生成二次校验）
+│   ├── speechText.ts               # 【v3】朗读前文本规整：−7 显示不变、读成「负7」而非「减七」
+│   ├── diagnostic.ts               # 〔v2 已冻结〕诊断引擎
 │   ├── spacedRepetition.ts         # 间隔偷袭调度器
 │   ├── levelManager.ts             # 关卡解锁逻辑
 │   ├── rewardEngine.ts             # 奖励判定
+│   ├── diveMathEngine.ts           # 潜水算术判定与过关结算（纯函数）
 │   ├── validateGraph.ts            # 知识图谱验证（构建期检查）
 │   └── validateDiveTasks.ts        # 题库数据验证（构建期检查）
 ├── services/
@@ -66,18 +71,22 @@ src/
 │   ├── tts.ts                      # TTS 调用（走 /api/tts 代理）
 │   ├── stt.ts                      # Web Speech API STT
 │   └── audio.ts                    # Web Audio API 音效
-├── store/useStore.ts               # Zustand 全局状态
+├── store/
+│   ├── useStore.ts                 # Zustand 全局状态
+│   └── persistenceSchema.ts        # 持久化字段注册表 + 版本迁移（STATE_VERSION）
 ├── data/
-│   ├── knowledgeGraph.ts           # 有理数 20 知识点图谱
+│   ├── dramaWorld.ts               # 【v3】世界观设定 + 第一季 5 集预写剧本（顶部有五条设计铁律）
+│   ├── knowledgeGraph.ts           # 有理数 20 知识点图谱 + PRACTICE_NODES
 │   ├── diveTasks.ts                # 潜水算术 39 题题库（纯数据）
 │   └── gameConfig.ts               # 兑换比例、间隔梯度等配置
 ├── hooks/                          # usePersistence, useHashRouting, useAudio, useGreeting, useLoginCheck, useSneakAttacks
 └── types/index.ts                  # TypeScript 类型定义
 
 server/
-├── api/chat.ts                     # AI API 代理
-├── api/tts.ts                      # TTS API 代理
-└── dev.ts                          # 本地开发服务器
+├── api/chat.ts                     # DeepSeek 代理（唯一实现，dev/prod 共用）
+├── api/tts.ts                      # TTS API 代理（唯一实现）
+├── dev.ts                          # 本地开发服务器
+└── dist/                           # build:server 产物（serve.cjs 运行时加载，勿提交）
 ```
 
 ## 当前状态
@@ -104,7 +113,9 @@ server/
 - [x] TTS 统一火山引擎 + 音效重做 + CelebrationOverlay 庆祝动画
 - [x] 规则怪谈防白嫖 + AI 去强制放行 + 题目极简 + 默认朗读
 - [x] 藏宝图每知识点 +2 珍珠 + 海龟汤防偷看汤底
-- [ ] 真实学生第二轮试用 + 反馈迭代
+- [x] **v3 短剧化改造 <2026-07-31>（本地完成，待真人测试）**：v2 奖励驱动模型经 3 周真实使用被证伪（孩子刷规则怪谈漏洞换食物、两条核心学习路径视而不见、20 点只亮 6 个）。改为「把数学做成她要追的下一集」——单按钮播放器（取消大厅即取消套利）、题嵌进剧情当主角的决定、答错不阻断走另一条分支、珍珠只从「听完一集」来、追完一季解锁点单权。设计见 `docs/superpowers/specs/2026-07-31-短剧化改造-设计方案.md`
+- [x] 架构迭代 P0-P4 <2026-07-30>：持久化版本迁移（persistenceSchema）+ 代理层三合一（server/api 唯一实现，删 Vercel 函数）+ 组件拆分（CafeHall 四拆、DiveMath 逻辑下沉 diveMathEngine）+ PRACTICE 兜底（8 轮未放行温和提示）+ PRACTICE_NODES 下沉 data 层
+- [ ] **v3 真人测试**：让她自己听第一季 5 集，看第 2 集钩子处会不会问"然后呢"、会不会连着往下听。不通过则方案作废，别继续加内容
 
 ## 部署铁律
 

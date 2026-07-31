@@ -1,13 +1,15 @@
 import { useState } from "react";
 import useStore from "../../store/useStore";
 import { useGreeting } from "../../hooks/useGreeting";
-import { useSneakAttacks } from "../../hooks/useSneakAttacks";
 import { getChapterProgress } from "../../engine/levelManager";
 import { EXCHANGE_RATE } from "../../data/gameConfig";
 import ShellCounter from "../shared/ShellCounter";
 import Mascot from "../shared/Mascot";
 import SoundToggle from "../shared/SoundToggle";
-import { NODE_MAP } from "../../data/knowledgeGraph";
+import { Sparkles, Waves } from "./CafeDecor";
+import RulesBoard from "./RulesBoard";
+import GuideModal from "./GuideModal";
+import SneakAttackBanner from "./SneakAttackBanner";
 import type { View } from "../../types";
 
 /* ── 卡片 ── */
@@ -74,61 +76,6 @@ function Card({
   );
 }
 
-/* ── 水面波光金点 ── */
-function Sparkles() {
-  return (
-    <div
-      className="absolute inset-0 pointer-events-none overflow-hidden z-0"
-      aria-hidden="true"
-    >
-      {Array.from({ length: 22 }).map((_, i) => (
-        <div
-          key={i}
-          className="absolute rounded-full"
-          style={{
-            width: `${3 + Math.random() * 8}px`,
-            height: `${3 + Math.random() * 8}px`,
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 60}%`,
-            background: Math.random() > 0.5 ? "#FFD89C" : "#FFEED0",
-            opacity: 0.25 + Math.random() * 0.4,
-            animation: `shimmer ${2 + Math.random() * 3}s ease-in-out infinite`,
-            animationDelay: `${Math.random() * 3}s`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-/* ── 底部海浪线 ── */
-function Waves() {
-  return (
-    <div
-      className="absolute bottom-0 left-0 right-0 pointer-events-none z-0"
-      aria-hidden="true"
-    >
-      <svg
-        viewBox="0 0 400 60"
-        preserveAspectRatio="none"
-        className="w-full"
-        style={{ height: 60 }}
-      >
-        <path
-          d="M0 30 Q 30 15 60 30 T 120 30 T 180 30 T 240 30 T 300 30 T 360 30 T 400 30 V60 H0 Z"
-          fill="#B8E6E0"
-          opacity="0.25"
-        />
-        <path
-          d="M0 38 Q 35 22 70 38 T 140 38 T 210 38 T 280 38 T 350 38 T 400 38 V60 H0 Z"
-          fill="#8ED7CF"
-          opacity="0.18"
-        />
-      </svg>
-    </div>
-  );
-}
-
 /* ═══════════════════════════════════════════
    咖啡馆大厅
    ═══════════════════════════════════════════ */
@@ -154,9 +101,6 @@ export default function CafeHall() {
     todayAdventureCount === 0
       ? "🎯 ×0.5"
       : `🔥 ×${multiplier.toFixed(1)} · 再过1关 → ×${nextMult.toFixed(1)}`;
-
-  // 间隔偷袭
-  const { dueAttacks, handleSneakSuccess } = useSneakAttacks();
 
   // 奖励规则看板
   const [showRules, setShowRules] = useState(false);
@@ -202,39 +146,7 @@ export default function CafeHall() {
         </div>
 
         {/* 间隔偷袭提醒 */}
-        {dueAttacks.length > 0 && (
-          <div className="px-4 mb-3 max-w-md md:max-w-lg mx-auto">
-            {dueAttacks.map((a) => {
-              const node = NODE_MAP.get(a.nodeId);
-              return (
-                <div
-                  key={a.nodeId}
-                  className="bg-amber-50/90 border border-amber-200 rounded-2xl p-3 flex items-center gap-3 animate-pop-in"
-                >
-                  <div className="text-2xl">⏰</div>
-                  <div className="flex-1">
-                    <div className="text-sm font-bold text-amber-700">
-                      还记得「{node?.name || a.nodeId}」吗？
-                    </div>
-                    <div className="text-xs text-amber-500">
-                      {a.context}到了，来复习一下吧！
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      handleSneakSuccess(a.nodeId);
-                      setDiveFocus(a.nodeId);
-                      setView("dive");
-                    }}
-                    className="px-4 py-2 rounded-full bg-amber-400 text-white text-xs font-bold hover:bg-amber-500 transition active:scale-95 whitespace-nowrap"
-                  >
-                    去复习 →
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <SneakAttackBanner />
 
         {/* 全局倍率横幅 + 游戏次数 */}
         <div className="px-4 mb-4 max-w-md md:max-w-lg mx-auto">
@@ -451,139 +363,10 @@ export default function CafeHall() {
       </div>
 
       {/* 奖励规则看板 */}
-      {showRules && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-ocean-deep/60 p-4"
-          onClick={() => setShowRules(false)}
-        >
-          <div
-            className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl max-h-[80vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="font-display text-xl text-ocean-deep text-center mb-4">
-              🎁 奖励规则
-            </h2>
-
-            <div className="space-y-4">
-              <section>
-                <h3 className="text-sm font-bold text-ocean-surface mb-2">
-                  🌟 碎片/珍珠怎么赚
-                </h3>
-                <div className="space-y-1.5 text-xs text-slate-600">
-                  <p>💬 今日探险每轮对话 +0.2 碎片</p>
-                  <p>🤔 真正想通一步 +2 碎片 +1 珍珠</p>
-                  <p>🏁 聊通一个知识点 +3 碎片 +3次游戏</p>
-                  <p>🏊 潜水算术过关 +1 珍珠 +2次游戏</p>
-                  <p>🎮 游戏角按算式得分结算碎片（0分=0）</p>
-                  <p>🐢 海龟汤首次破解 +5 珍珠 +3次游戏</p>
-                  <p>🗺️ 藏宝图每掌握1个知识点 +2 珍珠</p>
-                  <p>📅 每日签到 +1 碎片，连续7天 +1 珍珠</p>
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-bold text-amber-600 mb-2">
-                  📈 倍率怎么算
-                </h3>
-                <div className="space-y-1.5 text-xs text-slate-600">
-                  <p>🎯 今天还没探险 → 所有活动 ×0.5</p>
-                  <p>🔥 每聊通1关 +0.3 倍率（上不封顶）</p>
-                  <p>🐱 从今日探险跳转潜水 → 更高收益</p>
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-bold text-violet-600 mb-2">
-                  🎮 游戏次数怎么获得
-                </h3>
-                <div className="space-y-1.5 text-xs text-slate-600">
-                  <p>探险过1关 +3次 · 潜水算术 +2次</p>
-                  <p>规则怪谈答对 +1次 · 海龟汤破解 +3次</p>
-                  <p>每日登录送 +2次 · 上限 10 次</p>
-                  <p>海底跳跃/贝壳收集每次消耗 1 次</p>
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-bold text-rose-500 mb-2">
-                  ⚠️ 答错扣减
-                </h3>
-                <div className="space-y-1.5 text-xs text-slate-600">
-                  <p>🤿 潜水算术每答错 1 次 → 扣 0.2 碎片</p>
-                  <p>💀 答错 5 次 → 过关 0 碎片</p>
-                  <p>📜 规则怪谈选错 → 不可重选，直接跳过</p>
-                  <p>🐢 看过汤底再玩 → 不再给奖励</p>
-                </div>
-              </section>
-            </div>
-
-            <button
-              onClick={() => setShowRules(false)}
-              className="mt-5 w-full py-3 rounded-full bg-teal-500 text-white font-bold text-sm hover:bg-teal-600 transition"
-            >
-              知道了
-            </button>
-          </div>
-        </div>
-      )}
+      {showRules && <RulesBoard onClose={() => setShowRules(false)} />}
 
       {/* 新手引导 */}
-      {showGuide && (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
-          onClick={dismissGuide}
-        >
-          <div
-            className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-center mb-4">
-              <Mascot size={56} />
-              <h2 className="font-display text-xl text-stone-700 mt-2">
-                欢迎来到喵喵趣学！
-              </h2>
-              <p className="text-xs text-stone-500 mt-1">
-                我是海小喵，你的数学探险伙伴～
-              </p>
-            </div>
-            <div className="space-y-3">
-              <div className="flex gap-3 bg-teal-50 rounded-2xl p-3">
-                <div className="text-2xl">1️⃣</div>
-                <div className="text-sm text-stone-600">
-                  <b className="text-teal-600">点「今日探险」</b>
-                  <br />
-                  海小喵会跟你聊天，看看你在哪个知识点卡住了。
-                </div>
-              </div>
-              <div className="flex gap-3 bg-amber-50 rounded-2xl p-3">
-                <div className="text-2xl">2️⃣</div>
-                <div className="text-sm text-stone-600">
-                  <b className="text-amber-600">答着答着就学懂了</b>
-                  <br />
-                  不用打字也可以——按 🎤 说话，或者拖数轴上的小猫回答。
-                </div>
-              </div>
-              <div className="flex gap-3 bg-rose-50 rounded-2xl p-3">
-                <div className="text-2xl">3️⃣</div>
-                <div className="text-sm text-stone-600">
-                  <b className="text-rose-500">学懂了就去练！</b>
-                  <br />
-                  对话框里会跳出「去潜水练一练」——点它，用手拖着海螺把算式走出来。
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={dismissGuide}
-              className="mt-5 w-full py-3 rounded-full bg-teal-500 text-white font-bold text-sm hover:bg-teal-600 transition"
-            >
-              开始探险 →
-            </button>
-            <p className="text-center text-[11px] text-stone-300 mt-2">
-              右上角 ? 随时可以再打开
-            </p>
-          </div>
-        </div>
-      )}
+      {showGuide && <GuideModal onDismiss={dismissGuide} />}
     </div>
   );
 }
