@@ -122,11 +122,25 @@ export function nextNodeToTeach(
   return fresh ? fresh.id : NODES[NODES.length - 1].id;
 }
 
-/** 播放器要用的整段序列：开场 → 推进 →（选择）→ 分支 → 钩子 */
+/**
+ * 按空行把一段正文拆成若干「节拍」。
+ *
+ * 为什么必须拆：整段送 TTS 会合成出几十秒的单个音频，
+ * 而且要整包下载完才开始播 —— 屏幕不动、也没声音，看起来像卡死。
+ * 短剧的节奏是几秒一跳，拆开之后首句出声快，画面也跟着走。
+ */
+export function splitBeats(text: string): string[] {
+  return text
+    .split(/\n\s*\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** 播放器要用的节拍序列：开场 → 推进 →（选择）→ 分支 → 钩子 */
 export function segmentsBefore(episode: Episode): string[] {
-  return [episode.openText, episode.bodyText].filter(Boolean);
+  return [episode.openText, episode.bodyText].flatMap(splitBeats);
 }
 
 export function segmentsAfter(episode: Episode, branchText: string): string[] {
-  return [branchText, episode.hookText].filter(Boolean);
+  return [branchText, episode.hookText].flatMap(splitBeats);
 }

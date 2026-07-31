@@ -9,6 +9,8 @@ import {
   pendingSeasonUnlock,
   judgeChoice,
   nextNodeToTeach,
+  splitBeats,
+  segmentsBefore,
   type EpisodeRecord,
 } from "./dramaEngine";
 import { PREWRITTEN_EPISODES, type Episode } from "../data/dramaWorld";
@@ -114,6 +116,50 @@ describe("judgeChoice", () => {
 
   it("无题集直接放行", () => {
     expect(judgeChoice(PREWRITTEN_EPISODES[0], "A").correct).toBe(true);
+  });
+});
+
+describe("splitBeats —— 按空行拆节拍", () => {
+  it("空行分段", () => {
+    expect(splitBeats("第一段。\n\n第二段。\n\n第三段。")).toEqual([
+      "第一段。",
+      "第二段。",
+      "第三段。",
+    ]);
+  });
+
+  it("单行内的换行不拆", () => {
+    expect(splitBeats("上一行\n下一行")).toEqual(["上一行\n下一行"]);
+  });
+
+  it("多余空行和首尾空白被清掉", () => {
+    expect(splitBeats("  甲  \n\n\n\n  乙  \n\n")).toEqual(["甲", "乙"]);
+  });
+
+  it("空字符串得到空数组", () => {
+    expect(splitBeats("")).toEqual([]);
+    expect(splitBeats("   \n\n  ")).toEqual([]);
+  });
+});
+
+describe("节拍长度 —— 每一拍都不能长到播不动", () => {
+  // 一拍 133 字会合成出 ~29 秒、586KB 的音频，要整包下完才出声，
+  // 屏幕不动又没声音，看起来像卡死。拆开后每拍必须够短。
+  it("全部预写剧集的每一拍都不超过 60 字", () => {
+    const tooLong: string[] = [];
+    for (const ep of PREWRITTEN_EPISODES) {
+      const beats = [
+        ...segmentsBefore(ep),
+        ...splitBeats(ep.branchRight),
+        ...splitBeats(ep.branchWrong),
+        ...splitBeats(ep.hookText),
+      ];
+      for (const b of beats) {
+        if (b.length > 60)
+          tooLong.push(`第${ep.no}集 ${b.length}字: ${b.slice(0, 25)}…`);
+      }
+    }
+    expect(tooLong).toEqual([]);
   });
 });
 
