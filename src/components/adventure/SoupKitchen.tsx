@@ -120,9 +120,7 @@ function soupSystemPrompt(soup: Soup): string {
 
 export default function SoupKitchen() {
   const setView = useStore((s) => s.setView);
-  const addPearls = useStore((s) => s.addPearls);
   const addPlayTokens = useStore((s) => s.addPlayTokens);
-  const showToast = useStore((s) => s.showToast);
   const currentNodeId = useStore((s) => s.currentNodeId);
   const solvedSoups = useStore((s) => s.solvedSoups);
   const revealedSoups = useStore((s) => s.revealedSoups);
@@ -263,10 +261,9 @@ export default function SoupKitchen() {
         ]);
         if (isSolved) {
           const reward = gained > 0 ? gained : 5;
-          addPearls(reward);
+          /* v4 单水龙头：珍珠与碎片只从「今天的活儿」来，此处停发 */
           addPlayTokens(3);
           addSolvedSoup(soupId);
-          showToast("pearl", reward);
           setSolved(true);
         }
       }

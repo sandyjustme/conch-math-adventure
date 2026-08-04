@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import useStore from "../../store/useStore";
-import { generateTextQuestions } from "../../data/expressionGenerator";
+import { generateRuleQuestions } from "../../data/rulesQuestions";
+import { computeRoundReward } from "../../engine/fractionEngine";
+import { flushPersistence } from "../../hooks/usePersistence";
 import { speakQuestion } from "../../services/tts";
 import Mascot from "../shared/Mascot";
 
@@ -11,12 +13,11 @@ import Mascot from "../shared/Mascot";
 
 export default function RulesSurvival() {
   const setView = useStore((s) => s.setView);
-  const addPearls = useStore((s) => s.addPearls);
   const addPlayTokens = useStore((s) => s.addPlayTokens);
   const addAnswerRecord = useStore((s) => s.addAnswerRecord);
   const showToast = useStore((s) => s.showToast);
   const currentNodeId = useStore((s) => s.currentNodeId);
-  const masteredNodes = useStore((s) => s.masteredNodes);
+  const answerRecords = useStore((s) => s.answerRecords);
   const ttsEnabled = useStore((s) => s.ttsEnabled);
 
   const [step, setStep] = useState<"intro" | "scenario" | "final">("intro");
@@ -27,18 +28,16 @@ export default function RulesSurvival() {
   const [showOptions, setShowOptions] = useState(false);
   const [highlightHint, setHighlightHint] = useState(false);
 
-  // 动态生成题目
-  const [scenarios] = useState(() => {
-    const questions = generateTextQuestions(currentNodeId, masteredNodes, 5);
-    return questions.map((q, i) => ({
-      story: q.question,
-      hint: q.hint,
-      choices: i < 4 ? [String(q.a), String(q.b)] : ["对", "错"],
-      correct: q.a > q.b ? 0 : 1,
-      explain: q.hint,
-      nodeId: q.nodeId,
-    }));
-  });
+  /**
+   * 题目跟着她的真实进度走：分数还断着就练断点那一层，过关了才上有理数。
+   *
+   * 原来这里用 expressionGenerator 生成，只有三个模板、全是「谁更大」，
+   * 而且第 5 题的选项被写死成 ["对","错"]、正确答案却仍按 a>b 判 ——
+   * 每一轮的最后一题都是道废题，点哪个全看运气。
+   */
+  const [scenarios] = useState(() =>
+    generateRuleQuestions(answerRecords, currentNodeId, 5)
+  );
 
   const scenario = scenarios[scIdx];
 
@@ -66,8 +65,8 @@ export default function RulesSurvival() {
     if (idx === scenario.correct) {
       setResult("correct");
       setCorrectCount((c) => c + 1);
-      addPearls(1);
-      addPlayTokens(1);
+      // 不再每答对一题就发珍珠 —— 那正是「一天傻点赚 1000 多珍珠」的口子。
+      // 改成整轮结束时一次结算，跟刻线用同一套奖励规则。
       addAnswerRecord({
         nodeId: scenario.nodeId,
         correct: true,
@@ -93,9 +92,14 @@ export default function RulesSurvival() {
     setResult(null);
     if (scIdx < scenarios.length - 1) {
       setScIdx((i) => i + 1);
-    } else {
-      setStep("final");
+      return;
     }
+    // 整轮结算：做了就有，做对更多，绝不归零（与刻线同一套规则）
+    const reward = computeRoundReward(correctCount, scenarios.length);
+    /* v4 单水龙头：珍珠与碎片只从「今天的活儿」来，此处停发 */
+    addPlayTokens(reward.playTokens);
+    flushPersistence();
+    setStep("final");
   };
 
   const startGame = () => {
@@ -234,7 +238,7 @@ export default function RulesSurvival() {
                 {result === "correct" ? "🕯️ 安全！" : "😿 不对哦～"}
               </div>
               <p className="text-xs text-white/50 leading-relaxed">
-                {scenario.explain}
+                {scenario.hint}
               </p>
               <div className="mt-3 flex gap-2 justify-center">
                 <button

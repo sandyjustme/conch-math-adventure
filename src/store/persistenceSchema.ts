@@ -14,7 +14,7 @@ import type {
   EpisodeRecord,
 } from "../types";
 
-export const STATE_VERSION = 3;
+export const STATE_VERSION = 4;
 export const VERSION_KEY = "stateVersion";
 
 export interface PersistedSnapshot {
@@ -36,6 +36,9 @@ export interface PersistedSnapshot {
   episodeProgress: EpisodeRecord[];
   seasonUnlocks: number[];
   generatedEpisodes: Episode[];
+  // ── v4 班次 ──
+  shiftDate: string;
+  shiftDoneToday: number;
 }
 
 const isNumber = (v: unknown): v is number => typeof v === "number";
@@ -156,6 +159,19 @@ export const FIELDS: FieldSpec[] = [
     read: (s) => s.generatedEpisodes,
     apply: (v) => ({ generatedEpisodes: v }),
   },
+  // ── v4 班次 ──
+  {
+    key: "shiftDate",
+    validate: isString,
+    read: (s) => s.shiftDate,
+    apply: (v) => ({ shiftDate: v }),
+  },
+  {
+    key: "shiftDoneToday",
+    validate: isNumber,
+    read: (s) => s.shiftDoneToday,
+    apply: (v) => ({ shiftDoneToday: v >= 0 ? v : 0 }),
+  },
 ];
 
 /**
@@ -176,6 +192,10 @@ export function migrate(
   if (fromVersion < 3) {
     // v2 没有短剧字段。currentEp 缺失时由 store 默认值 1 兜底，
     // 老用户升级后从第 1 集开始追，v2 的存档一条都不动。
+  }
+  if (fromVersion < 4) {
+    // v3 没有班次字段。shiftDate 缺失 → store 默认空串 → 首次开工
+    // 视为新的一天，正常发工资。珍珠、掌握度、答题记录一条不动。
   }
   return data;
 }

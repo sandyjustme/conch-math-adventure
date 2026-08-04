@@ -12,11 +12,17 @@ export default function GameCorner() {
 
   if (activeGame === "bubble-jump") {
     return (
-      <div className="min-h-screen bg-ocean-shimmer">
+      <div
+        className="min-h-screen"
+        style={{
+          background:
+            "linear-gradient(180deg, #07090C 0%, #0E141C 50%, #16202C 100%)",
+        }}
+      >
         <header className="flex items-center gap-3 px-4 py-3">
           <button
             onClick={() => setActiveGame(null)}
-            className="text-xl font-body"
+            className="text-xl font-body text-slate-300 hover:text-slate-100"
           >
             ← 返回
           </button>
@@ -28,11 +34,17 @@ export default function GameCorner() {
 
   if (activeGame === "shell-collector") {
     return (
-      <div className="min-h-screen bg-ocean-shimmer">
+      <div
+        className="min-h-screen"
+        style={{
+          background:
+            "linear-gradient(180deg, #07090C 0%, #0E141C 50%, #16202C 100%)",
+        }}
+      >
         <header className="flex items-center gap-3 px-4 py-3">
           <button
             onClick={() => setActiveGame(null)}
-            className="text-xl font-body"
+            className="text-xl font-body text-slate-300 hover:text-slate-100"
           >
             ← 返回
           </button>
@@ -65,11 +77,11 @@ export default function GameCorner() {
             className="w-full bg-white rounded-3xl p-5 shadow-md hover:shadow-lg transition text-left"
           >
             <div className="flex items-center gap-4">
-              <div className="text-4xl">🫧</div>
+              <div className="text-4xl">🤿</div>
               <div>
-                <div className="font-body font-bold text-lg">海底跳跃</div>
+                <div className="font-body font-bold text-lg">深潜补氧</div>
                 <div className="font-body text-sm text-slate-500">
-                  帮海小螺跳到正确的数字气泡上
+                  氧气一直在掉，算式的值就是补的秒数
                 </div>
               </div>
             </div>
@@ -82,9 +94,9 @@ export default function GameCorner() {
             <div className="flex items-center gap-4">
               <div className="text-4xl">🐚</div>
               <div>
-                <div className="font-body font-bold text-lg">贝壳收集</div>
+                <div className="font-body font-bold text-lg">沉船翻牌</div>
                 <div className="font-body text-sm text-slate-500">
-                  收集正数贝壳，认识正负数
+                  翻牌配对：两个算式一样大才是一对
                 </div>
               </div>
             </div>

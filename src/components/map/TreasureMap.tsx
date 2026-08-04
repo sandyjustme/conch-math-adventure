@@ -14,8 +14,7 @@ export default function TreasureMap() {
   useEffect(() => {
     if (masteredNodes.length > lastCount.current) {
       const gained = (masteredNodes.length - lastCount.current) * 2;
-      useStore.getState().addPearls(gained);
-      useStore.getState().showToast("pearl", gained);
+      /* v4 单水龙头：珍珠与碎片只从「今天的活儿」来，此处停发 */
       lastCount.current = masteredNodes.length;
     }
   }, [masteredNodes.length]);

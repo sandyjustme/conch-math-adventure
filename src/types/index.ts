@@ -58,7 +58,9 @@ export interface EpisodeRecord {
 }
 
 export type View =
+  | "shift"
   | "drama"
+  | "fraction"
   | "cafe"
   | "adventure"
   | "dive"

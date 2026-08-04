@@ -15,7 +15,6 @@ export function useSneakAttacks() {
   const setSneakAttacks = useStore((s) => s.setSneakAttacks);
   const updateSneakAttack = useStore((s) => s.updateSneakAttack);
   const removeSneakAttack = useStore((s) => s.removeSneakAttack);
-  const addFragments = useStore((s) => s.addFragments);
 
   useEffect(() => {
     setSneakAttacks((prev) => {
@@ -47,12 +46,12 @@ export function useSneakAttacks() {
       const attack = sneakAttacks.find((a) => a.nodeId === nodeId);
       if (attack) {
         const reward = getSneakReward(attack.level);
-        addFragments(reward);
+        /* v4 单水龙头：珍珠与碎片只从「今天的活儿」来，此处停发 */
         const updated = advanceSneakLevel(attack);
         updateSneakAttack(updated);
       }
     },
-    [sneakAttacks, addFragments, updateSneakAttack]
+    [sneakAttacks, updateSneakAttack]
   );
 
   const handleSneakFail = useCallback(

@@ -16,7 +16,7 @@ export function useLoginCheck(loaded: boolean) {
     if (!lastLoginDate) {
       state.setLastLogin(today);
       state.setConsecutiveDays(1);
-      state.addFragments(1);
+      /* v4 单水龙头：珍珠与碎片只从「今天的活儿」来，此处停发 */
       return;
     }
 
@@ -31,13 +31,13 @@ export function useLoginCheck(loaded: boolean) {
     if (lastLoginDate === yesterdayStr) {
       const newCount = consecutiveDays + 1;
       state.setConsecutiveDays(newCount);
-      state.addFragments(1);
+      /* v4 单水龙头：珍珠与碎片只从「今天的活儿」来，此处停发 */
       if (newCount === 7) {
-        state.addPearls(1);
+        /* v4 单水龙头：珍珠与碎片只从「今天的活儿」来，此处停发 */
       }
     } else {
       state.setConsecutiveDays(1);
-      state.addFragments(1);
+      /* v4 单水龙头：珍珠与碎片只从「今天的活儿」来，此处停发 */
     }
 
     state.setLastLogin(today);

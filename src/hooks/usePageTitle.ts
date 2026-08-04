@@ -2,7 +2,9 @@ import { useEffect } from "react";
 import type { View } from "../types";
 
 const TITLES: Record<View, string> = {
+  shift: "今天的活儿 · 喵喵趣学",
   drama: "地下十三层 · 喵喵趣学",
+  fraction: "刻线 · 喵喵趣学",
   cafe: "喵喵趣学",
   adventure: "海底探险 · 喵喵趣学",
   dive: "潜水算术 · 喵喵趣学",

@@ -14,6 +14,14 @@ import type {
 interface AppState {
   currentView: View;
 
+  // ── v4 班次（主线）──
+  /** 当前班次所属日期 YYYY-MM-DD，跨天自动重置 */
+  shiftDate: string;
+  /** 今天已完工的工单数，满 ORDERS_PER_SHIFT 即打烊 */
+  shiftDoneToday: number;
+  /** 完工一张工单：跨天先归零再计数 */
+  completeWorkOrder: (today: string) => void;
+
   // ── v3 短剧 ──
   /** 下一集要播的集号，从 1 开始 */
   currentEp: number;
@@ -127,7 +135,17 @@ interface AppState {
 let _toastId = 0;
 
 const useStore = create<AppState>((set) => ({
-  currentView: "drama",
+  currentView: "shift",
+
+  // ── v4 班次 ──
+  shiftDate: "",
+  shiftDoneToday: 0,
+  completeWorkOrder: (today) =>
+    set((s) =>
+      s.shiftDate === today
+        ? { shiftDoneToday: s.shiftDoneToday + 1 }
+        : { shiftDate: today, shiftDoneToday: 1 }
+    ),
 
   // ── v3 短剧 ──
   currentEp: 1,

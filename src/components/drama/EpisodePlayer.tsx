@@ -30,10 +30,7 @@ export default function EpisodePlayer() {
   const completeEpisode = useStore((s) => s.completeEpisode);
   const advanceEpisode = useStore((s) => s.advanceEpisode);
   const unlockSeason = useStore((s) => s.unlockSeason);
-  const addPearls = useStore((s) => s.addPearls);
   const addAnswerRecord = useStore((s) => s.addAnswerRecord);
-  const masterNode = useStore((s) => s.masterNode);
-  const showToast = useStore((s) => s.showToast);
   const ttsEnabled = useStore((s) => s.ttsEnabled);
 
   const episode = getEpisode(currentEp, generatedEpisodes);
@@ -101,13 +98,12 @@ export default function EpisodePlayer() {
         latencyMs: 0,
         timestamp: Date.now(),
       });
-      if (correct) masterNode(episode.nodeId);
+      /* v4：主干推进只属于班次 —— 娱乐线与冻结区不得写 masterNode */
     }
 
     if (first) {
       // 珍珠只从「听完一集」来，答对答错都给 —— 她没有可优化的东西
-      addPearls(1);
-      showToast("pearl", 1);
+      /* v4 单水龙头：珍珠与碎片只从「今天的活儿」来，此处停发 */
     }
 
     // 解锁判定要用「加上这一集之后」的进度，不能用闭包里的旧值
@@ -354,6 +350,14 @@ export default function EpisodePlayer() {
             听过的集数不再给珍珠
           </p>
         )}
+        {/* 主线入口。下一步要做的是把剧集解锁挂到这里 ——
+            练完才有得看，休息区只消耗主线产出，不并联产出 */}
+        <button
+          onClick={() => setView("fraction")}
+          className="mt-10 text-sm text-slate-500 hover:text-slate-300 underline underline-offset-4"
+        >
+          📏 去刻线
+        </button>
       </div>
     );
   }

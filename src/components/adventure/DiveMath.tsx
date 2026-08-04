@@ -63,11 +63,8 @@ function beep(freq: number, on: boolean) {
 
 export default function DiveMath() {
   const setView = useStore((s) => s.setView);
-  const addFragments = useStore((s) => s.addFragments);
-  const addPearls = useStore((s) => s.addPearls);
   const addPlayTokens = useStore((s) => s.addPlayTokens);
   const addAnswerRecord = useStore((s) => s.addAnswerRecord);
-  const showToast = useStore((s) => s.showToast);
   const sfxEnabled = useStore((s) => s.sfxEnabled);
   const diveFocus = useStore((s) => s.diveFocus);
   const diveFromAdventure = useStore((s) => s.diveFromAdventure);
@@ -154,10 +151,8 @@ export default function DiveMath() {
           todayAdventureCount
         );
         if (reward.fragments > 0) {
-          addFragments(reward.fragments);
-          addPearls(reward.pearls);
+          /* v4 单水龙头：珍珠与碎片只从「今天的活儿」来，此处停发 */
           addPlayTokens(reward.playTokens);
-          showToast("fragment", reward.fragments);
         }
         addAnswerRecord({
           nodeId: task.node,

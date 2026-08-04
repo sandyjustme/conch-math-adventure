@@ -1,6 +1,8 @@
 import useStore from "../../store/useStore";
-import { NODES } from "../../data/knowledgeGraph";
+import { NODES, NODE_MAP } from "../../data/knowledgeGraph";
 import { computeAnalytics } from "../../engine/analytics";
+import { breakdownReport } from "../../engine/shiftPlanner";
+import { SKILL_NAME } from "../../data/fractionTasks";
 import Mascot from "../shared/Mascot";
 import RadarChart from "../shared/RadarChart";
 
@@ -28,6 +30,9 @@ export default function Dashboard() {
         masteredNodes: state.masteredNodes,
         sneakAttacks: state.sneakAttacks,
         answerRecords: state.answerRecords,
+        // v4 班次：少了这两个，恢复备份等于当天班次重置、可再领一份工资
+        shiftDate: state.shiftDate,
+        shiftDoneToday: state.shiftDoneToday,
         redemptions: state.redemptions,
         rareShells: state.rareShells,
         // 也备份音效偏好
@@ -86,6 +91,9 @@ export default function Dashboard() {
           masteredNodes: d.masteredNodes,
           sneakAttacks: d.sneakAttacks,
           answerRecords: d.answerRecords,
+          // 旧备份没有班次字段时兜空值 —— 首次开工按新的一天算
+          shiftDate: d.shiftDate ?? "",
+          shiftDoneToday: d.shiftDoneToday ?? 0,
           redemptions: d.redemptions,
           rareShells: d.rareShells,
           ttsEnabled: d.ttsEnabled ?? true,
@@ -189,6 +197,98 @@ export default function Dashboard() {
       </header>
 
       <div className="p-4 max-w-md md:max-w-lg mx-auto space-y-4 pb-8">
+        {/* 断点 —— 只给家长看。她的界面上永远不出现任何统计 */}
+        {(() => {
+          const b = breakdownReport(records, mastered);
+          const trunkName = NODE_MAP.get(b.trunkNode)?.name ?? b.trunkNode;
+          // 近 20 条班次首试（旧模块的记录 latencyMs=0，天然被排除）。
+          // 支撑 Step 0 观察表第三行：有思考痕迹 vs 蒙混（快而随机）
+          const probes = records.filter((r) => r.latencyMs > 0).slice(-20);
+          const probeRight = probes.filter((r) => r.correct).length;
+          const probeAvgSec = probes.length
+            ? (
+                probes.reduce((sum, r) => sum + r.latencyMs, 0) /
+                probes.length /
+                1000
+              ).toFixed(1)
+            : null;
+          return (
+            <div className="bg-white rounded-2xl p-4 shadow-sm">
+              <h3 className="font-bold text-slate-700 mb-1">🔎 她卡在哪</h3>
+              <p className="text-xs text-slate-400 mb-3">
+                这一块只有你看得到，她的界面上没有任何统计
+              </p>
+
+              {probeAvgSec !== null && (
+                <div className="text-xs text-slate-500 mb-3">
+                  近 {probes.length} 次首试：对 {probeRight} 次 · 平均想{" "}
+                  {probeAvgSec} 秒
+                  <span className="text-slate-300">
+                    （秒数极短且对错随机 = 在蒙）
+                  </span>
+                </div>
+              )}
+
+              <div className="text-sm text-slate-600 mb-3">
+                主干走到{" "}
+                <b className="text-teal-600">
+                  {b.trunkNode} {trunkName}
+                </b>
+                {b.trunkStuck ? (
+                  <span className="text-rose-500">（卡住了）</span>
+                ) : (
+                  <span className="text-emerald-600">（还顺）</span>
+                )}
+              </div>
+
+              {b.remediating ? (
+                <div className="text-sm bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
+                  正在补小学：
+                  <b className="text-amber-700">{SKILL_NAME[b.remediating]}</b>
+                </div>
+              ) : b.path.length > 0 ? (
+                <div className="text-xs text-slate-400 mb-3">
+                  暂时不用补小学
+                </div>
+              ) : (
+                <div className="text-xs text-slate-400 mb-3">
+                  这个知识点没有配小学补漏内容
+                </div>
+              )}
+
+              {b.path.length > 0 && (
+                <div className="space-y-1.5">
+                  {b.path.map((p) => (
+                    <div
+                      key={p.skill}
+                      className="flex items-center justify-between text-xs"
+                    >
+                      <span className="text-slate-600">
+                        {SKILL_NAME[p.skill]}
+                      </span>
+                      <span
+                        className={
+                          p.samples === 0
+                            ? "text-slate-300"
+                            : p.passing
+                              ? "text-emerald-600"
+                              : "text-rose-500"
+                        }
+                      >
+                        {p.samples === 0
+                          ? "还没测到"
+                          : p.passing
+                            ? `过了 · ${p.samples} 次`
+                            : `还没过 · ${p.samples} 次`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* 概览卡片 */}
         <div className="grid grid-cols-3 gap-2 text-center">
           {[

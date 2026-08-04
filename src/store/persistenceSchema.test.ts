@@ -67,6 +67,33 @@ describe("persistenceSchema", () => {
     expect(patch.seasonUnlocks).toBeUndefined();
   });
 
+  it("v3 → v4：短剧与 v2 存档全在，班次字段由默认值兜底", () => {
+    const v3Raw: Record<string, unknown> = {
+      shells: { fragments: 4, pearls: 31 },
+      masteredNodes: ["K1", "K3"],
+      answerRecords: [
+        { nodeId: "F4", correct: false, latencyMs: 0, timestamp: 1 },
+      ],
+      currentEp: 6,
+      episodeProgress: [{ no: 1, choice: null, correct: null, completedAt: 1 }],
+      seasonUnlocks: [1],
+    };
+    const patch = buildPatch(migrate(3, v3Raw));
+    expect(patch.pearls).toBe(31);
+    expect(patch.currentEp).toBe(6);
+    expect(patch.episodeProgress).toHaveLength(1);
+    expect(patch.seasonUnlocks).toEqual([1]);
+    expect(patch.answerRecords).toHaveLength(1); // 路由要靠它，不能丢
+    // v4 新字段不进补丁 → store 默认值（首次开工视为新的一天）
+    expect(patch.shiftDate).toBeUndefined();
+    expect(patch.shiftDoneToday).toBeUndefined();
+  });
+
+  it("shiftDoneToday 为负数时纠正为 0", () => {
+    expect(buildPatch({ shiftDoneToday: -3 }).shiftDoneToday).toBe(0);
+    expect(buildPatch({ shiftDoneToday: 2 }).shiftDoneToday).toBe(2);
+  });
+
   it("currentEp 为 0 或负数时纠正为 1", () => {
     expect(buildPatch({ currentEp: 0 }).currentEp).toBe(1);
     expect(buildPatch({ currentEp: -5 }).currentEp).toBe(1);
@@ -118,6 +145,8 @@ describe("persistenceSchema", () => {
       episodeProgress: [{ no: 1, choice: null, correct: null, completedAt: 1 }],
       seasonUnlocks: [1],
       generatedEpisodes: [],
+      shiftDate: "2026-08-02",
+      shiftDoneToday: 2,
     };
     for (const f of FIELDS) {
       const stored = f.read(snapshot);

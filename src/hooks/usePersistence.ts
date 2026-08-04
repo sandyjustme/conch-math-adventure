@@ -95,6 +95,8 @@ export function usePersistence() {
   const episodeProgress = useStore((s) => s.episodeProgress);
   const seasonUnlocks = useStore((s) => s.seasonUnlocks);
   const generatedEpisodes = useStore((s) => s.generatedEpisodes);
+  const shiftDate = useStore((s) => s.shiftDate);
+  const shiftDoneToday = useStore((s) => s.shiftDoneToday);
   const loadedRef = useRef(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -148,6 +150,8 @@ export function usePersistence() {
     episodeProgress,
     seasonUnlocks,
     generatedEpisodes,
+    shiftDate,
+    shiftDoneToday,
   ]);
 
   return loaded;

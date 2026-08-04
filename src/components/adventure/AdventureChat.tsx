@@ -34,12 +34,10 @@ export default function AdventureChat() {
   const currentNodeId = useStore((s) => s.currentNodeId);
   const setCurrentNode = useStore((s) => s.setCurrentNode);
   const addPearls = useStore((s) => s.addPearls);
-  const addFragments = useStore((s) => s.addFragments);
   const showToast = useStore((s) => s.showToast);
   const setDiveFocus = useStore((s) => s.setDiveFocus);
   const setDiagnosticsCompleted = useStore((s) => s.setDiagnosticsCompleted);
   const incrementAdventureCount = useStore((s) => s.incrementAdventureCount);
-  const masterNode = useStore((s) => s.masterNode);
   const addAnswerRecord = useStore((s) => s.addAnswerRecord);
 
   const [input, setInput] = useState("");
@@ -97,8 +95,7 @@ export default function AdventureChat() {
         const isPractice = parsePracticeTag(reply);
 
         if (rewardGained > 0) {
-          addPearls(rewardGained);
-          addFragments(2);
+          /* v4 单水龙头：珍珠与碎片只从「今天的活儿」来，此处停发 */
           showToast("pearl", rewardGained);
         }
 
@@ -107,16 +104,13 @@ export default function AdventureChat() {
           fragPending.current += 0.2;
           if (fragPending.current >= 1) {
             const earned = Math.floor(fragPending.current);
-            addFragments(earned);
             fragPending.current -= earned;
           }
         }
 
         // PRACTICE：聊通了一个知识点
         if (isPractice) {
-          addFragments(3);
           if (fragPending.current > 0) {
-            addFragments(1);
             fragPending.current = 0;
           }
           setDiagnosticsCompleted();
@@ -158,7 +152,7 @@ export default function AdventureChat() {
           if (rewardGained > 0) u.steps = Math.min(4, u.steps + 1);
           if (ready && !u.ready) {
             u.ready = true;
-            masterNode(replyNode);
+            /* v4：主干推进只属于班次 —— 娱乐线与冻结区不得写 masterNode */
             showToast("levelup");
           }
           return u;

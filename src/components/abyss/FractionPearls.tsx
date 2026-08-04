@@ -105,7 +105,6 @@ const TRAY_Y = 210;
 
 export default function FractionPearls() {
   const setView = useStore((s) => s.setView);
-  const addFragments = useStore((s) => s.addFragments);
   const addAnswerRecord = useStore((s) => s.addAnswerRecord);
   const showToast = useStore((s) => s.showToast);
   const todayAdventureCount = useStore((s) => s.todayAdventureCount);
@@ -201,7 +200,7 @@ export default function FractionPearls() {
       const mult = getGlobalMultiplier(todayAdventureCount);
       const earned = Math.floor(1 * mult);
       if (earned > 0) {
-        addFragments(earned);
+        /* v4 单水龙头：珍珠与碎片只从「今天的活儿」来，此处停发 */
         showToast("fragment", earned);
       }
       // TTS 朗读过关小结

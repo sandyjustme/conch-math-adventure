@@ -40,40 +40,37 @@ describe("baseFragments", () => {
   });
 });
 
-describe("computeLevelReward", () => {
-  it("满血 + 从探险跳转 + 今日已过1关 → 1×1.5×1.0 = 1 碎片", () => {
-    expect(computeLevelReward(0, true, 1)).toEqual({
-      fragments: 1,
-      pearls: 1,
-      playTokens: 2,
-    });
+describe("computeLevelReward —— 通关必有产出，绝不归零", () => {
+  // 原规则「算出来 ≤0 就三样全不发」制造了两条反向激励，
+  // 正是「做了很多题却什么都没有」的直接来源。
+  it("答错 5 次，通关照样有保底", () => {
+    const r = computeLevelReward(5, true, 3);
+    expect(r.fragments).toBeGreaterThan(0);
+    expect(r.pearls).toBeGreaterThan(0);
+    expect(r.playTokens).toBeGreaterThan(0);
   });
 
-  it("今日未探险 → 全局倍率 0.5，1×1.5×0.5=0.75 → 取整 0，三样都不发", () => {
-    expect(computeLevelReward(0, true, 0)).toEqual({
-      fragments: 0,
-      pearls: 0,
-      playTokens: 0,
-    });
+  it("今日还没去探险（倍率 0.5）也有保底", () => {
+    const r = computeLevelReward(0, true, 0);
+    expect(r.fragments).toBeGreaterThan(0);
+    expect(r.pearls).toBeGreaterThan(0);
+    expect(r.playTokens).toBeGreaterThan(0);
   });
 
-  it("答错 5 次 → 过关 0 碎片且无珍珠无次数", () => {
-    expect(computeLevelReward(5, true, 3)).toEqual({
-      fragments: 0,
-      pearls: 0,
-      playTokens: 0,
-    });
+  it("零失误多给 1 珍珠", () => {
+    expect(computeLevelReward(0, true, 1).pearls).toBe(2);
+    expect(computeLevelReward(2, true, 1).pearls).toBe(1);
   });
 
-  it("错 2 次 + 跳转加成 + 过2关 → 0.6×1.5×1.3=1.17 → 1 碎片", () => {
-    expect(computeLevelReward(2, true, 2).fragments).toBe(1);
+  it("错 0–1 次多给 1 次游戏", () => {
+    expect(computeLevelReward(1, true, 1).playTokens).toBe(2);
+    expect(computeLevelReward(2, true, 1).playTokens).toBe(1);
   });
 
-  it("碎片 >0 时固定 +1 珍珠 +2 次数", () => {
-    const r = computeLevelReward(0, false, 2);
-    expect(r.fragments).toBe(1); // 1×1.0×1.3 = 1.3 → 1
-    expect(r.pearls).toBe(1);
-    expect(r.playTokens).toBe(2);
+  it("答得越好碎片越多", () => {
+    expect(computeLevelReward(0, true, 3).fragments).toBeGreaterThan(
+      computeLevelReward(5, true, 3).fragments
+    );
   });
 });
 
